@@ -1,0 +1,984 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Radix Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: lab-bench panels on a cool slate ground, sticky tab rail; amber LED = a 1 bit, coral = sign bit, teal = carries/weights */
+:root{
+  --bg:#E8ECF1; --panel:#FFFFFF; --panel2:#F3F5F8; --ink:#142235; --muted:#566377; --line:#D0D8E2;
+  --cell:#F8FAFC; --led:#F2A31B; --led-ink:#2A1900; --led-glow:rgba(242,163,27,.42);
+  --accent:#8A5200; --sig:#D1495B; --carry:#0B7A86; --ok:#1B7A4A; --bad:#C0392B; --focus:#2F6FE0; --hl:#FCF0D9;
+  --f-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E141C; --panel:#151E29; --panel2:#1A2532; --ink:#E5ECF4; --muted:#95A2B4; --line:#2A3748;
+  --cell:#18222E; --led:#FFB22E; --led-ink:#231400; --led-glow:rgba(255,178,46,.45);
+  --accent:#FFC46B; --sig:#FF7A8A; --carry:#45C9D6; --ok:#58D58E; --bad:#FF7B6E; --focus:#7FA8FF; --hl:#2A2316; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141C; --panel:#151E29; --panel2:#1A2532; --ink:#E5ECF4; --muted:#95A2B4; --line:#2A3748;
+  --cell:#18222E; --led:#FFB22E; --led-ink:#231400; --led-glow:rgba(255,178,46,.45);
+  --accent:#FFC46B; --sig:#FF7A8A; --carry:#45C9D6; --ok:#58D58E; --bad:#FF7B6E; --focus:#7FA8FF; --hl:#2A2316; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:1120px;margin-inline:auto;padding-inline:20px}
+@media (max-width:520px){.wrap{padding-inline:16px}}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2.5px solid var(--focus);outline-offset:2px}
+
+/* header */
+header.top{padding-block:30px 20px}
+.top-grid{display:flex;flex-wrap:wrap;gap:20px 40px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font:700 .74rem var(--f-body);text-transform:uppercase;letter-spacing:.14em;color:var(--carry);margin:0 0 .4rem}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(2.4rem,6vw,3.6rem);line-height:.95;letter-spacing:-.025em;margin:0}
+h1 sub{font-size:.38em;font-family:var(--f-mono);font-weight:700;color:var(--accent);letter-spacing:0;vertical-align:baseline;margin-left:.08em}
+.lede{margin:.7rem 0 0;color:var(--muted);max-width:54ch;font-size:1.05rem}
+.ticker{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-family:var(--f-mono);font-variant-numeric:tabular-nums;min-width:0}
+.ticker dt{font:700 .68rem var(--f-body);letter-spacing:.1em;color:var(--muted);align-self:center}
+.ticker dd{margin:0;font-weight:700}
+.leds{display:flex;gap:5px}
+.leds i{width:14px;height:14px;border-radius:50%;background:var(--cell);border:1.5px solid var(--line);transition:background .25s,box-shadow .25s}
+.leds i.on{background:var(--led);border-color:var(--led);box-shadow:0 0 10px var(--led-glow)}
+
+/* tabs */
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.tabrow{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabrow::-webkit-scrollbar{display:none}
+.tab{appearance:none;border:0;background:none;color:var(--muted);font:700 .93rem var(--f-body);padding:13px 12px 10px;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--led)}
+
+main{padding-block:26px 64px}
+.panel{display:grid;gap:18px}
+.intro{display:grid;gap:12px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start}
+@media (max-width:820px){.intro{grid-template-columns:1fr}}
+.intro h2{font-family:var(--f-display);font-weight:800;font-size:clamp(1.6rem,3.4vw,2.1rem);line-height:1.1;margin:0 0 .4rem;text-wrap:balance;letter-spacing:-.01em}
+.intro p{margin:0;color:var(--muted);max-width:66ch}
+.key{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.95rem}
+.key b{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--carry);margin-bottom:3px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+@media (max-width:520px){.card{padding:14px}}
+.card h3{font-family:var(--f-display);font-weight:600;font-size:1.2rem;margin:0 0 .2rem;text-wrap:balance}
+.card h4{font:700 .75rem var(--f-body);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 .5rem}
+.note{color:var(--muted);margin:.1rem 0 .9rem;font-size:.93rem;max-width:72ch}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:18px}
+
+/* form */
+.row{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end}
+.field{display:grid;gap:5px;min-width:0}
+.field>label,.lbl{font:700 .72rem var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:var(--cell);border:1.5px solid var(--line);border-radius:9px;padding:8px 11px;min-width:0}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--focus);outline:none}
+input.big{font-family:var(--f-mono);font-size:1.3rem;padding:9px 14px;width:100%}
+.grow{flex:1 1 230px}
+.narrow{width:6.2em}
+input[type=range]{accent-color:var(--led);width:100%}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--cell);flex-wrap:wrap}
+.seg button{appearance:none;border:0;background:none;color:var(--ink);font:700 .9rem var(--f-mono);padding:8px 12px;cursor:pointer}
+.seg button+button{border-left:1.5px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--panel)}
+.seg.txt button{font-family:var(--f-body)}
+.err{color:var(--bad);font-weight:700;margin:.5rem 0 0}
+.err:empty{display:none}
+.chip{appearance:none;border:1.5px solid var(--line);background:var(--cell);color:var(--ink);font:500 .85rem var(--f-mono);padding:5px 11px;border-radius:999px;cursor:pointer}
+.chip:hover{border-color:var(--led)}
+.btn{appearance:none;border:1.5px solid var(--ink);background:var(--ink);color:var(--panel);font:700 .95rem var(--f-body);padding:9px 16px;border-radius:10px;cursor:pointer}
+.btn.ghost{background:var(--cell);color:var(--ink);border-color:var(--line)}
+
+/* bits */
+.bits{display:flex;gap:4px;flex-wrap:nowrap}
+.bit{display:inline-grid;place-items:center;width:2.05rem;height:2.35rem;max-width:3rem;border:1.5px solid var(--line);border-radius:7px;background:var(--cell);font:700 1rem var(--f-mono);color:var(--muted);flex:none;padding:0;
+  transition:background .25s,color .25s,box-shadow .25s,border-color .25s,max-width .4s,opacity .4s,transform .25s}
+.bit.on{background:var(--led);border-color:var(--led);color:var(--led-ink);box-shadow:0 0 12px var(--led-glow)}
+.bit.sign{border-color:var(--sig);box-shadow:inset 0 -3px 0 var(--sig)}
+.bit.on.sign{box-shadow:inset 0 -3px 0 var(--sig),0 0 12px var(--led-glow)}
+.bit.sm{width:1.7rem;height:2rem;font-size:.9rem;border-radius:6px}
+.bit.pad{border-style:dashed}
+.bit.hide{max-width:0;opacity:0;border-width:0;overflow:hidden}
+.bit.keep,.bit.ext{outline:2px solid var(--carry);outline-offset:2px}
+button.bit{cursor:pointer}
+button.bit:hover{border-color:var(--led)}
+.bit.flip{animation:flip .3s ease}
+@keyframes flip{50%{transform:scaleY(.15)}}
+.scroll{overflow-x:auto;padding-bottom:6px;max-width:100%}
+
+/* convert */
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:12px;margin-top:14px}
+.out{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel2);min-width:0;display:grid;gap:5px;align-content:start}
+.out-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.out-name{font-weight:700}
+.radix{font:500 .74rem var(--f-mono);color:var(--muted)}
+.copy{margin-left:auto;appearance:none;border:1px solid var(--line);background:var(--cell);color:var(--muted);font:700 .72rem var(--f-body);padding:3px 8px;border-radius:6px;cursor:pointer}
+.out-v{font:600 1.12rem var(--f-mono);word-break:break-all;font-variant-numeric:tabular-nums}
+.out-n{font-size:.8rem;color:var(--muted)}
+.outs.stale .out-v{opacity:.3}
+.flash{animation:flash .7s ease}
+@keyframes flash{from{color:var(--accent);text-shadow:0 0 14px var(--led-glow)}}
+.reg{display:flex;gap:5px;width:max-content;padding-top:4px}
+.rc{display:grid;justify-items:center;gap:4px}
+.rc.gap{margin-right:12px}
+.rc .w{font:500 .66rem var(--f-mono);color:var(--carry)}
+.rc .ix{font:500 .62rem var(--f-mono);color:var(--muted)}
+.reg.off{opacity:.4;pointer-events:none}
+.sumline{margin:.7rem 0 0;font-size:.95rem;word-break:break-word}
+
+/* stepper */
+.stepper{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sbtn{appearance:none;border:1.5px solid var(--line);background:var(--cell);color:var(--ink);font:700 .88rem var(--f-body);padding:7px 11px;border-radius:9px;cursor:pointer;min-width:2.6em}
+.sbtn:hover{border-color:var(--led)}
+.sbtn.play{background:var(--ink);color:var(--panel);border-color:var(--ink);min-width:7.2em}
+.prog{color:var(--muted);font:500 .82rem var(--f-mono);margin-inline:6px}
+.spd{margin-left:auto;font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center}
+.spd select{padding:4px 8px;font-size:.85rem}
+.say{margin:.8rem 0 1rem;padding:10px 14px;border-radius:10px;background:var(--hl);font-size:1rem;min-height:2.9em}
+.say:empty{display:none}
+.instant,.instant *{transition:none!important;animation:none!important}
+.pv{opacity:0;transform:translateY(7px);transition:opacity .35s,transform .35s;transition-delay:var(--d,0ms)}
+.pv.shown{opacity:1;transform:none}
+
+/* division tables */
+.dv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:22px}
+.tablewrap{overflow-x:auto}
+table.steps{border-collapse:collapse;font-family:var(--f-mono);font-variant-numeric:tabular-nums;width:100%}
+table.steps th{font:700 .7rem var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+table.steps td{padding:7px 10px;border-bottom:1px solid var(--line);transition:opacity .35s,background .35s;white-space:nowrap}
+tr.pend td{opacity:.07}
+tr.now td{background:var(--hl)}
+td.dig{font-weight:800;color:var(--accent)}
+td.dig small{font-weight:400;color:var(--muted)}
+td.dig.lit span{background:var(--led);color:var(--led-ink);border-radius:5px;box-shadow:0 0 10px var(--led-glow)}
+td.dig span{padding:1px 6px;transition:background .3s;transition-delay:var(--d,0ms)}
+.readdir{font-size:.85rem;color:var(--carry);font-weight:700;margin:.5rem 0 0}
+.result{margin-top:18px;font:600 clamp(1.15rem,3vw,1.5rem) var(--f-mono);display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em;font-variant-numeric:tabular-nums}
+.result .rd{color:var(--accent);font-weight:800;display:inline-flex;flex-wrap:wrap}
+
+/* expansion */
+.ex-row{display:flex;gap:8px;width:max-content;align-items:stretch}
+.ex-c{display:grid;gap:4px;justify-items:center;align-content:start;padding:10px 8px;border:1.5px solid var(--line);border-radius:10px;background:var(--panel2);min-width:5.4em;font-family:var(--f-mono);transition:border-color .3s,background .3s}
+.ex-d{font-size:1.9rem;font-weight:800;line-height:1.1}
+.ex-dv{font-size:.72rem;color:var(--muted);min-height:1.1em}
+.ex-w{font-size:.95rem;color:var(--carry);font-weight:700}
+.ex-wv{font-size:.76rem;color:var(--muted)}
+.ex-t{font-size:.78rem;color:var(--muted);text-align:center;border-top:1px dashed var(--line);padding-top:4px;width:100%}
+.ex-t b{color:var(--ink);font-size:.98rem;display:block}
+.ex-c.now{border-color:var(--led);background:var(--hl)}
+.ex-pt{align-self:center;font:800 2rem var(--f-mono)}
+.ex-sum{margin-top:16px;font-family:var(--f-mono);display:grid;gap:6px}
+#exExpr{color:var(--muted);word-break:break-word;font-size:.95rem}
+.ex-total{font-size:1.45rem;font-weight:700}
+.ex-total b{color:var(--accent)}
+
+/* grouping */
+.gr-row{display:flex;align-items:flex-start;gap:0;width:max-content;transition:gap .5s}
+.gr-row.split{gap:14px}
+.grp{display:grid;gap:8px;justify-items:center;padding:8px 6px;border:1.5px dashed transparent;border-radius:10px;transition:border-color .4s}
+.gr-row.split .grp{border-color:var(--line)}
+.gbits{display:flex}
+.gbits .bit+.bit{margin-left:4px}
+.gdig{font:800 1.6rem var(--f-mono);color:var(--accent);line-height:1.1}
+.gval{font:500 .74rem var(--f-mono);color:var(--carry);min-height:1.1em}
+.gpt{font:800 1.9rem var(--f-mono);padding:6px 4px 0}
+
+/* signed */
+.rep{display:grid;grid-template-columns:minmax(150px,190px) auto minmax(0,1fr);gap:6px 18px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.rep:first-child{border-top:0}
+@media (max-width:820px){.rep{grid-template-columns:1fr}}
+.rep-name{font-weight:700}
+.rep-range{font:500 .78rem var(--f-mono);color:var(--muted)}
+.rep-note{font-size:.88rem;color:var(--muted);margin:0}
+.na{color:var(--bad);font-size:.9rem;margin:0;font-weight:700}
+.vrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+.vbig{font:800 2rem var(--f-mono);min-width:4.5ch;text-align:right;font-variant-numeric:tabular-nums}
+.wts{display:flex;gap:4px;margin-top:5px}
+.wts span{width:2.05rem;text-align:center;font:500 .64rem var(--f-mono);color:var(--carry);flex:none}
+.itab{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;margin-top:14px;font-size:.95rem}
+.itab dt{color:var(--muted)}
+.itab dd{margin:0;font:700 1rem var(--f-mono);word-break:break-word}
+.itab dd small{font-weight:400;color:var(--muted);font-size:.8rem}
+.tcg{display:grid;grid-template-columns:auto auto;gap:8px 14px;align-items:center;width:max-content}
+.tcg .lab{font-size:.85rem;color:var(--muted);text-align:right;white-space:nowrap}
+.tcg .rule{grid-column:2;height:2px;background:var(--ink);opacity:.55}
+.sx{display:grid;grid-template-columns:auto auto auto;gap:8px 14px;align-items:center;width:max-content}
+.sx .lab{font-size:.85rem;color:var(--muted);white-space:nowrap}
+.sx .val{font:700 .95rem var(--f-mono)}
+
+/* wheel */
+.wheel svg{width:100%;max-width:370px;display:block;margin-inline:auto}
+.wring{fill:none;stroke:var(--line);stroke-width:2}
+.wn{cursor:pointer}
+.wn circle{fill:var(--cell);stroke:var(--line);stroke-width:1.5;transition:fill .3s,stroke .3s}
+.wn text.v{font:700 12.5px var(--f-mono);fill:var(--ink)}
+.wn.neg text.v{fill:var(--sig)}
+.wn text.p{font:500 10.5px var(--f-mono);fill:var(--muted)}
+.wn.sel circle{fill:var(--led);stroke:var(--led)}
+.wn.sel text.v{fill:var(--led-ink)}
+.wn:focus{outline:none}
+.wn:focus-visible circle{stroke:var(--focus);stroke-width:3}
+.seam{stroke:var(--bad);stroke-width:2;stroke-dasharray:5 4}
+.seamlbl{font:700 10px var(--f-body);fill:var(--bad);letter-spacing:.06em}
+.ptrg{transform-box:view-box;transform-origin:180px 180px;transition:transform .45s cubic-bezier(.3,1.35,.6,1)}
+.ptr{stroke:var(--led);stroke-width:3.5;stroke-linecap:round}
+.hub{fill:var(--led)}
+.wmsg{min-height:3em;margin:.6rem 0 0;font-size:.95rem;text-align:center}
+.wmsg.ovf{color:var(--bad);font-weight:700}
+.wctl{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin-top:8px}
+
+/* arithmetic */
+.ag{display:grid;gap:5px 4px;width:max-content;align-items:center}
+.ag .lab{font-size:.85rem;color:var(--muted);padding-right:12px;white-space:nowrap}
+.ac{display:grid;place-items:center;border-radius:6px;padding:3px 0;min-height:1.6rem;transition:background .3s}
+.ac.col-on{background:var(--hl)}
+.ac.hd{font:500 .62rem var(--f-mono);color:var(--muted);min-height:0}
+.ac.carry span{font:800 .85rem var(--f-mono);color:var(--carry)}
+.ag .rule{grid-column:2/-1;height:2px;background:var(--ink);opacity:.55}
+.dimB .bit{opacity:.35}
+.flags{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.flag{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px 12px 7px 8px;background:var(--panel2)}
+.flag .fl{font:800 1rem var(--f-mono);width:1.9em;height:1.9em;display:grid;place-items:center;border-radius:6px;background:var(--cell);border:1.5px solid var(--line)}
+.flag.set .fl{background:var(--led);border-color:var(--led);color:var(--led-ink);box-shadow:0 0 10px var(--led-glow)}
+.flag span{font-size:.85rem}
+.flag small{color:var(--muted);display:block;font-size:.72rem}
+.verdict{margin-top:12px;font-size:1rem;padding:11px 14px;border-radius:10px;border:1.5px solid var(--line);max-width:80ch}
+.verdict.ok{border-color:var(--ok)}
+.verdict.bad{border-color:var(--bad)}
+.okt{color:var(--ok);font-weight:700}
+.badt{color:var(--bad);font-weight:700}
+.presets{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* practice */
+.pq-q{font:700 clamp(1.15rem,3vw,1.45rem) var(--f-body);margin:.2rem 0 1rem;font-variant-numeric:tabular-nums}
+.pq-q .mono{font-weight:700;color:var(--accent)}
+.fb{margin:.8rem 0 0;font-size:1rem;min-height:1.5em}
+.fb.ok{color:var(--ok);font-weight:700}
+.fb.bad{color:var(--bad);font-weight:700}
+.score{display:flex;gap:18px;flex-wrap:wrap;font:700 .95rem var(--f-mono)}
+.score span{color:var(--muted);font:700 .7rem var(--f-body);text-transform:uppercase;letter-spacing:.1em;display:block}
+footer{color:var(--muted);font-size:.85rem;padding-block:0 40px}
+@media (prefers-reduced-motion: reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+</style>
+
+<header class="top">
+  <div class="wrap top-grid">
+    <div>
+      <p class="eyebrow">Digital logic design · interactive lab</p>
+      <h1>Radix Lab<sub>2·8·10·16</sub></h1>
+      <p class="lede">Convert between number systems, see why each method works, and watch signed binary arithmetic happen one bit at a time.</p>
+    </div>
+    <dl class="ticker" aria-label="Counter shown in four bases">
+      <dt>BIN</dt><dd class="leds" id="tkLeds"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></dd>
+      <dt>OCT</dt><dd id="tkOct">234</dd>
+      <dt>DEC</dt><dd id="tkDec">156</dd>
+      <dt>HEX</dt><dd id="tkHex">9C</dd>
+    </dl>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Topics"><div class="wrap tabrow" role="tablist" id="tabs"></div></nav>
+
+<main class="wrap">
+
+<!-- CONVERT -->
+<section class="panel" id="p-convert" role="tabpanel">
+  <div class="intro">
+    <div><h2>One value, every base</h2>
+    <p>Type a number in any base from 2 to 36, with or without a fractional part. Every other representation updates as you type, including the binary codes BCD, Excess-3 and Gray.</p></div>
+    <div class="key"><b>Key idea</b>In base <i>r</i>, a digit in position <i>k</i> is worth digit × r<sup>k</sup>. Base 16 borrows the letters A–F for the digit values 10–15.</div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <div class="field grow"><label for="cvIn">Number</label><input id="cvIn" type="text" class="big" value="156.375" spellcheck="false" autocomplete="off"></div>
+      <div class="field"><span class="lbl">Input base</span><div class="seg" id="cvSeg"><button type="button" data-b="2">2</button><button type="button" data-b="8">8</button><button type="button" data-b="10" class="on">10</button><button type="button" data-b="16">16</button></div></div>
+      <div class="field"><label for="cvOther">Any base</label><input id="cvOther" type="number" min="2" max="36" value="10" class="narrow mono"></div>
+    </div>
+    <p class="err" id="cvErr"></p>
+    <div class="outs" id="cvOuts"></div>
+  </div>
+  <div class="card">
+    <h3>16-bit register</h3>
+    <p class="note">Click any bit. Each position carries a weight of 2<sup>k</sup>, and the value is the sum of the weights whose bit is 1.</p>
+    <div class="scroll"><div class="reg" id="reg"></div></div>
+    <p class="sumline mono" id="regSum"></p>
+  </div>
+</section>
+
+<!-- DIVIDE -->
+<section class="panel" id="p-divide" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Decimal to base <i>r</i></h2>
+    <p>The integer part is converted by repeated division, the fractional part by repeated multiplication. Step through the method or let it play.</p></div>
+    <div class="key"><b>Key idea</b>Dividing by <i>r</i> peels off the lowest digit as the remainder. Multiplying a fraction by <i>r</i> pushes the next digit across the radix point.</div>
+  </div>
+  <div class="card" id="dvScope">
+    <div class="row">
+      <div class="field grow"><label for="dvN">Decimal number</label><input id="dvN" type="text" class="big" value="156.375" spellcheck="false" autocomplete="off"></div>
+      <div class="field"><span class="lbl">Target base</span><div class="seg" id="dvSeg"><button type="button" data-b="2" class="on">2</button><button type="button" data-b="8">8</button><button type="button" data-b="16">16</button></div></div>
+      <div class="field"><label for="dvB">Any base</label><input id="dvB" type="number" min="2" max="36" value="2" class="narrow mono"></div>
+    </div>
+    <div style="margin-top:16px" id="dvCtl"></div>
+    <p class="say" id="dvSay"></p>
+    <div id="dvBox"></div>
+  </div>
+</section>
+
+<!-- EXPAND -->
+<section class="panel" id="p-expand" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Base <i>r</i> to decimal</h2>
+    <p>Write each digit's place value as a power of the base, multiply, and add. Positions left of the point count up from 0; positions right of it count down from −1.</p></div>
+    <div class="key"><b>Key idea</b>N = Σ d<sub>k</sub> × r<sup>k</sup>. For 2F7.A<sub>16</sub>: 2×256 + 15×16 + 7×1 + 10×1/16 = 759.625.</div>
+  </div>
+  <div class="card" id="exScope">
+    <div class="row">
+      <div class="field grow"><label for="exN">Number</label><input id="exN" type="text" class="big" value="2F7.A" spellcheck="false" autocomplete="off"></div>
+      <div class="field"><span class="lbl">Its base</span><div class="seg" id="exSeg"><button type="button" data-b="2">2</button><button type="button" data-b="8">8</button><button type="button" data-b="16" class="on">16</button></div></div>
+      <div class="field"><label for="exB">Any base</label><input id="exB" type="number" min="2" max="36" value="16" class="narrow mono"></div>
+    </div>
+    <div style="margin-top:16px" id="exCtl"></div>
+    <p class="say" id="exSay"></p>
+    <div id="exBox"></div>
+  </div>
+</section>
+
+<!-- GROUP -->
+<section class="panel" id="p-group" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Binary, octal and hex by grouping</h2>
+    <p>No arithmetic needed. Group bits outward from the radix point, three at a time for octal and four at a time for hexadecimal, or expand each digit back into bits.</p></div>
+    <div class="key"><b>Key idea</b>8 = 2<sup>3</sup> and 16 = 2<sup>4</sup>, so one octal digit is exactly 3 bits and one hex digit is exactly 4 bits. To go octal ↔ hex, pass through binary.</div>
+  </div>
+  <div class="card" id="grScope">
+    <div class="row">
+      <div class="field"><span class="lbl">Direction</span><div class="seg txt" id="grMode"><button type="button" data-m="toBase" class="on">Binary → digits</button><button type="button" data-m="toBin">Digits → binary</button></div></div>
+      <div class="field"><span class="lbl">Other base</span><div class="seg" id="grSeg"><button type="button" data-b="8">8 (oct)</button><button type="button" data-b="16" class="on">16 (hex)</button></div></div>
+      <div class="field grow"><label for="grIn" id="grInLbl">Binary number</label><input id="grIn" type="text" class="big" value="1011010111.011" spellcheck="false" autocomplete="off"></div>
+    </div>
+    <div style="margin-top:16px" id="grCtl"></div>
+    <p class="say" id="grSay"></p>
+    <div id="grStage"></div>
+  </div>
+</section>
+
+<!-- SIGNED -->
+<section class="panel" id="p-signed" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Signed numbers</h2>
+    <p>With <i>n</i> bits there are 2<sup>n</sup> patterns. Each signed scheme decides which patterns mean negative values. Move the slider or click the bits and compare the four schemes side by side.</p></div>
+    <div class="key"><b>Key idea</b>In 2’s complement the MSB has weight −2<sup>n−1</sup> and every other bit keeps its usual positive weight. That single rule explains the range, the negation trick and why one adder serves addition and subtraction.</div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <div class="field"><span class="lbl">Word size</span><div class="seg" id="sgN"><button type="button" data-n="4">4-bit</button><button type="button" data-n="8" class="on">8-bit</button><button type="button" data-n="16">16-bit</button></div></div>
+      <div class="field grow"><label for="sgV">Value</label>
+        <div class="vrow"><input id="sgV" type="range" min="-128" max="127" value="-37"><input id="sgVn" type="number" class="narrow mono" value="-37" aria-label="Value"></div></div>
+    </div>
+    <div style="margin-top:12px" id="sgReps"></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>Read a bit pattern</h3>
+      <p class="note">Click bits to build a pattern. The same bits mean different values depending on the scheme. Weights shown are for 2’s complement.</p>
+      <div class="scroll"><div class="bits" id="ipBits"></div><div class="wts" id="ipW"></div></div>
+      <dl class="itab" id="ipOut"></dl>
+    </div>
+    <div class="card" id="tcScope">
+      <h3>Forming the 2’s complement</h3>
+      <p class="note">Negate by inverting every bit, then adding 1. Uses the value chosen above.</p>
+      <div id="tcCtl"></div>
+      <p class="say" id="tcSay"></p>
+      <div class="scroll" id="tcBox"></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>The 4-bit number wheel</h3>
+      <p class="note">Sixteen patterns arranged in a circle. Adding 1 moves one step clockwise. The dashed line marks where the value jumps: crossing it is overflow.</p>
+      <div class="wctl"><div class="seg txt" id="whScheme"><button type="button" data-s="un">Unsigned</button><button type="button" data-s="sm">Sign–mag</button><button type="button" data-s="one">1’s</button><button type="button" data-s="two" class="on">2’s</button></div></div>
+      <div class="wheel" id="wheel"></div>
+      <div class="wctl"><button type="button" class="btn ghost" id="whDec">− 1</button><button type="button" class="btn" id="whInc">+ 1</button></div>
+      <p class="wmsg" id="whMsg">Click a pattern or use ±1.</p>
+    </div>
+    <div class="card">
+      <h3>Sign extension</h3>
+      <p class="note">To widen a 2’s complement number, copy its sign bit into every new position. Padding with zeros only works for non-negative values.</p>
+      <div class="scroll" id="sxBox"></div>
+      <p class="note" id="sxNote" style="margin-top:12px"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ARITH -->
+<section class="panel" id="p-arith" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Binary arithmetic</h2>
+    <p>Watch a ripple-carry adder work column by column. Subtraction reuses the same adder, and the status flags tell you whether the answer fits in the word.</p></div>
+    <div class="key"><b>Key idea</b>A − B = A + ¬B + 1. Signed overflow happens exactly when the carry into the MSB differs from the carry out of it: V = C<sub>n−1</sub> ⊕ C<sub>n</sub>.</div>
+  </div>
+  <div class="card" id="arScope">
+    <div class="row">
+      <div class="field"><span class="lbl">Word size</span><div class="seg" id="arN"><button type="button" data-n="4" class="on">4</button><button type="button" data-n="8">8</button><button type="button" data-n="16">16</button></div></div>
+      <div class="field"><span class="lbl">Number system</span><div class="seg txt" id="arSch"><button type="button" data-s="two" class="on">2’s comp</button><button type="button" data-s="one">1’s comp</button><button type="button" data-s="un">Unsigned</button></div></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label for="arA">A (decimal)</label><input id="arA" type="number" class="narrow mono" value="6"></div>
+      <div class="field"><span class="lbl">Operation</span><div class="seg" id="arOp"><button type="button" data-o="+" class="on">+</button><button type="button" data-o="-">−</button></div></div>
+      <div class="field"><label for="arB">B (decimal)</label><input id="arB" type="number" class="narrow mono" value="3"></div>
+      <div class="field grow"><span class="lbl">Try</span><div class="presets" id="arPre"></div></div>
+    </div>
+    <p class="err" id="arErr"></p>
+    <div style="margin-top:16px" id="arCtl"></div>
+    <p class="say" id="arSay"></p>
+    <div id="arBox"></div>
+  </div>
+</section>
+
+<!-- PRACTICE -->
+<section class="panel" id="p-practice" role="tabpanel" hidden>
+  <div class="intro">
+    <div><h2>Practice</h2>
+    <p>Fresh questions every time. Leading zeros and spaces in your answer are fine. If you get stuck, “Show me how” opens the matching animation with these exact numbers.</p></div>
+    <div class="key"><b>Tip</b>Prefixes such as 0b and 0x are accepted. For 2’s complement answers, give all 8 bits.</div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="field"><label for="pqType">Question type</label><select id="pqType"></select></div>
+      <div class="score" id="pqScore"></div>
+    </div>
+    <p class="pq-q" id="pqQ"></p>
+    <form class="row" id="pqForm">
+      <div class="field grow"><label for="pqAns">Your answer</label><input id="pqAns" type="text" class="big" spellcheck="false" autocomplete="off"></div>
+      <button class="btn" type="submit">Check</button>
+      <button class="btn ghost" type="button" id="pqHow">Show me how</button>
+      <button class="btn ghost" type="button" id="pqNext">Next question</button>
+    </form>
+    <p class="fb" id="pqFb"></p>
+  </div>
+</section>
+</main>
+<footer class="wrap">Radix Lab · numbers are handled exactly for whole parts; long fractions are rounded to 12 digits and marked with “…”.</footer>
+
+<script>
+(function(){
+const DIG='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const SUBD='₀₁₂₃₄₅₆₇₈₉',SUPD='⁰¹²³⁴⁵⁶⁷⁸⁹';
+const sub=n=>String(n).replace(/\d/g,d=>SUBD[d]);
+const sup=n=>String(n).replace(/-/g,'⁻').replace(/\d/g,d=>SUPD[d]);
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const minus=s=>String(s).replace(/^-/,'−');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const clampBase=v=>{v=parseInt(v,10);return isNaN(v)?10:Math.min(36,Math.max(2,v));};
+const fmtN=x=>minus(Number.isInteger(x)?String(x):String(+x.toPrecision(12)));
+const say=(k,t)=>{$('#'+k+'Say').textContent=t;};
+const toBits=(x,n)=>{const m=2**n;return (((x%m)+m)%m).toString(2).padStart(n,'0');};
+const inv=b=>b.replace(/[01]/g,c=>c==='0'?'1':'0');
+const uval=b=>parseInt(b,2)||0;
+const dec2=b=>uval(b)-(b[0]==='1'?2**b.length:0);
+const decSM=b=>{const m=uval(b.slice(1));return b[0]==='1'?(m?-m:'−0'):m;};
+const dec1=b=>{if(b[0]!=='1')return uval(b);const m=uval(inv(b));return m?-m:'−0';};
+const decEx=b=>uval(b)-2**(b.length-1);
+const fv=v=>typeof v==='number'?minus(v):v;
+
+function parseNum(raw,base){
+  let s=String(raw).trim().toUpperCase().replace(/[\s_ ]/g,'').replace(/^−/,'-');
+  let neg=false;
+  if(s.startsWith('-')){neg=true;s=s.slice(1);}else if(s.startsWith('+'))s=s.slice(1);
+  if(!s||s==='.')return {ok:false,err:'Enter a number.'};
+  const parts=s.split('.');
+  if(parts.length>2)return {ok:false,err:'Use at most one radix point.'};
+  const ip=parts[0],fp=parts[1]||'',B=BigInt(base);
+  const badd=ch=>`“${ch}” is not a base-${base} digit. Allowed digits are 0–${DIG[base-1]}.`;
+  let I=0n;
+  for(const ch of ip){const d=DIG.indexOf(ch);if(d<0||d>=base)return {ok:false,err:badd(ch)};I=I*B+BigInt(d);}
+  let F=0,w=1/base;
+  for(const ch of fp){const d=DIG.indexOf(ch);if(d<0||d>=base)return {ok:false,err:badd(ch)};F+=d*w;w/=base;}
+  return {ok:true,neg,int:I,frac:F};
+}
+function fracDigits(f,base,limit){
+  let out='';
+  for(let i=0;i<limit&&f>1e-12;i++){f*=base;let d=Math.floor(f+1e-9);if(d>=base)d=base-1;out+=DIG[d];f=Math.max(0,f-d);if(f<1e-9)f=0;}
+  return {out,approx:f>=1e-9};
+}
+function fmt(p,base,limit=12){
+  let s=p.int.toString(base).toUpperCase();
+  if(p.frac>0){const r=fracDigits(p.frac,base,limit);if(r.out)s+='.'+r.out+(r.approx?'…':'');}
+  return (p.neg&&(p.int>0n||p.frac>0)?'−':'')+s;
+}
+function groupStr(s,g){
+  const neg=s.startsWith('−');if(neg)s=s.slice(1);
+  const tail=s.endsWith('…')?'…':'';if(tail)s=s.slice(0,-1);
+  let [ip,fp]=s.split('.');
+  ip=ip.replace(new RegExp(`\\B(?=(.{${g}})+$)`,'g'),' ');
+  if(fp!==undefined)fp=fp.replace(new RegExp(`(.{${g}})(?=.)`,'g'),'$1 ');
+  return (neg?'−':'')+ip+(fp!==undefined?'.'+fp:'')+tail;
+}
+
+/* ---------- Stepper ---------- */
+class Stepper{
+  constructor(ctrl,scope,build){
+    Object.assign(this,{ctrl,scope,build,steps:[],i:0,timer:null,speed:1});
+    ctrl.className='stepper';
+    ctrl.innerHTML=`<button type="button" class="sbtn" data-a="reset" aria-label="Back to start" title="Back to start">⏮</button><button type="button" class="sbtn" data-a="back" aria-label="Previous step" title="Previous step">◀</button><button type="button" class="sbtn play" data-a="play">▶ Play</button><button type="button" class="sbtn" data-a="next" aria-label="Next step" title="Next step">▶|</button><span class="prog"></span><label class="spd">Speed <select><option value="0.5">Slow</option><option value="1" selected>Normal</option><option value="2">Fast</option></select></label>`;
+    ctrl.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+      if(a==='play'){this.toggle();return;}
+      this.stop();
+      if(a==='reset')this.jump(0);else if(a==='back')this.jump(Math.max(0,this.i-1));else if(a==='next')this.next();});
+    $('select',ctrl).addEventListener('change',e=>{this.speed=+e.target.value;if(this.timer){this.stop();this.start();}});
+  }
+  load(){this.stop();this.jump(Infinity);}
+  jump(k){
+    this.steps=this.build()||[];k=Math.min(k,this.steps.length);
+    this.scope.classList.add('instant');
+    for(let j=0;j<k;j++)this.steps[j]();
+    this.i=k;void this.scope.offsetWidth;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>this.scope.classList.remove('instant')));
+    this.ui();
+  }
+  next(){if(this.i<this.steps.length){this.steps[this.i]();this.i++;}if(this.i>=this.steps.length&&this.timer)this.stop();this.ui();}
+  start(){clearInterval(this.timer);this.timer=setInterval(()=>this.next(),(reduce?600:1150)/this.speed);this.ui();}
+  stop(){clearInterval(this.timer);this.timer=null;this.ui();}
+  toggle(){if(this.timer){this.stop();return;}if(this.i>=this.steps.length)this.jump(0);this.next();if(this.i<this.steps.length)this.start();}
+  replay(){this.stop();this.jump(0);setTimeout(()=>{this.next();if(this.i<this.steps.length)this.start();},250);}
+  ui(){const p=$('.prog',this.ctrl);p.textContent=this.steps.length?`${this.i} / ${this.steps.length}`:'–';
+    $('[data-a=play]',this.ctrl).textContent=this.timer?'❚❚ Pause':(this.steps.length&&this.i>=this.steps.length?'↻ Replay':'▶ Play');}
+}
+function segBind(sel,attr,fn){
+  $(sel).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    $$(sel+' button').forEach(x=>x.classList.toggle('on',x===b));fn(b.dataset[attr]);});
+}
+function segSet(sel,attr,val){$$(sel+' button').forEach(x=>x.classList.toggle('on',x.dataset[attr]===String(val)));}
+const debounce=(fn,ms=250)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};};
+
+/* ---------- Tabs ---------- */
+const TABS=[['convert','Convert'],['divide','Decimal → base r'],['expand','Base r → decimal'],['group','Bin ↔ Oct ↔ Hex'],['signed','Signed numbers'],['arith','Binary arithmetic'],['practice','Practice']];
+$('#tabs').innerHTML=TABS.map(([k,l])=>`<button type="button" class="tab" role="tab" id="t-${k}" aria-controls="p-${k}" data-t="${k}">${l}</button>`).join('');
+function switchTab(k){
+  if(!TABS.some(t=>t[0]===k))k='convert';
+  $$('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.t===k));
+  $$('.panel').forEach(p=>p.hidden=p.id!=='p-'+k);
+  try{history.replaceState(null,'','#'+k);}catch(e){}
+  const nav=$('nav.tabs');const y=nav.offsetTop;if(window.scrollY>y)window.scrollTo(0,y);
+  $('#t-'+k).scrollIntoView({block:'nearest',inline:'nearest'});
+}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b)switchTab(b.dataset.t);});
+
+/* ---------- Header ticker ---------- */
+let tv=156;
+function tick(){$('#tkDec').textContent=tv;$('#tkOct').textContent=tv.toString(8);$('#tkHex').textContent=tv.toString(16).toUpperCase().padStart(2,'0');
+  $$('#tkLeds i').forEach((el,k)=>el.classList.toggle('on',!!((tv>>(7-k))&1)));}
+tick();if(!reduce)setInterval(()=>{tv=(tv+1)%256;tick();},1300);
+
+/* ---------- Convert ---------- */
+const cv={base:10,nb:5,reg:0};
+const OUTS=[{k:'bin',name:'Binary',b:2},{k:'oct',name:'Octal',b:8},{k:'dec',name:'Decimal',b:10},{k:'hex',name:'Hexadecimal',b:16},{k:'any',name:'Base',b:0},{k:'bcd',name:'BCD (8421)'},{k:'xs3',name:'Excess-3'},{k:'gray',name:'Gray code'}];
+$('#cvOuts').innerHTML=OUTS.map(o=>`<div class="out"><div class="out-h"><span class="out-name">${o.name}${o.b===0?' <span id="cvNbv">5</span>':''}</span>${o.b>0?`<span class="radix">base ${o.b}</span>`:''}<button type="button" class="copy" data-k="${o.k}">Copy</button></div>${o.b===0?'<input id="cvNb" type="range" min="2" max="36" value="5" aria-label="Output base">':''}<div class="out-v" id="o-${o.k}"></div><div class="out-n" id="n-${o.k}"></div></div>`).join('');
+function put(k,v,note){const el=$('#o-'+k);if(el.textContent!==v){el.textContent=v;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}$('#n-'+k).textContent=note||'';}
+function cvUpdate(){
+  const p=parseNum($('#cvIn').value,cv.base);
+  $('#cvErr').textContent=p.ok?'':p.err;$('#cvOuts').classList.toggle('stale',!p.ok);
+  if(!p.ok){regSync(null);return;}
+  const intBits=p.int.toString(2).length;
+  put('bin',groupStr(fmt(p,2,16),4),`${intBits} bit${intBits>1?'s':''} before the point · grouped in nibbles`);
+  put('oct',fmt(p,8),'each octal digit = 3 bits');
+  put('dec',fmt(p,10),'');
+  put('hex',fmt(p,16),'each hex digit = 4 bits');
+  put('any',fmt(p,cv.nb),cv.nb>10?`digits 0–9 then A–${DIG[cv.nb-1]}`:`digits 0–${cv.nb-1}`);
+  const sign=p.neg&&(p.int>0n||p.frac>0)?'−':'';
+  const ds=fmt({...p,neg:false},10).replace('…','');
+  const code=off=>sign+[...ds].map(c=>c==='.'?'.':(+c+off).toString(2).padStart(4,'0')).join(' ').replace(/ \. /,' . ');
+  put('bcd',code(0),'each decimal digit coded separately in 4 bits');
+  put('xs3',code(3),'each decimal digit + 3, in 4 bits (self-complementing)');
+  if(!p.neg&&p.frac===0){put('gray',groupStr((p.int^(p.int>>1n)).toString(2),4),'gᵢ = bᵢ ⊕ bᵢ₊₁ · neighbours differ in one bit');}
+  else put('gray','—','Gray code is defined for whole numbers ≥ 0');
+  regSync(p);
+}
+function regBuild(){let h='';for(let i=15;i>=0;i--)h+=`<div class="rc${i%4===0&&i?' gap':''}"><span class="w">${2**i}</span><button type="button" class="bit" data-i="${i}" aria-label="Bit ${i}, weight ${2**i}">0</button><span class="ix">b${i}</span></div>`;$('#reg').innerHTML=h;}
+function regSync(p){
+  const ok=p&&!p.neg&&p.frac===0&&p.int<65536n;
+  $('#reg').classList.toggle('off',!ok);
+  if(!ok){$('#regSum').textContent=p?'The register holds whole numbers from 0 to 65 535. This value has a sign, a fraction or more than 16 bits.':'';return;}
+  const v=Number(p.int);cv.reg=v;
+  $$('#reg .bit').forEach(b=>{const i=+b.dataset.i,on=(v>>i)&1;const was=b.textContent;b.textContent=on;b.classList.toggle('on',!!on);if(was!==String(on)){b.classList.remove('flip');void b.offsetWidth;b.classList.add('flip');}});
+  const w=[];for(let i=15;i>=0;i--)if((v>>i)&1)w.push(2**i);
+  $('#regSum').textContent=w.length?`${w.join(' + ')} = ${v}`:'No bits set: the value is 0.';
+}
+$('#reg').addEventListener('click',e=>{const b=e.target.closest('.bit');if(!b)return;const v=cv.reg^(1<<+b.dataset.i);$('#cvIn').value=v.toString(cv.base).toUpperCase();cvUpdate();});
+function cvSetBase(b){
+  const p=parseNum($('#cvIn').value,cv.base);cv.base=b;
+  if(p.ok)$('#cvIn').value=fmt(p,b,16).replace('…','').replace('−','-');
+  segSet('#cvSeg','b',b);$('#cvOther').value=b;cvUpdate();
+}
+segBind('#cvSeg','b',b=>cvSetBase(+b));
+$('#cvOther').addEventListener('change',e=>cvSetBase(clampBase(e.target.value)));
+$('#cvIn').addEventListener('input',cvUpdate);
+$('#cvNb').addEventListener('input',e=>{cv.nb=+e.target.value;$('#cvNbv').textContent=cv.nb;cvUpdate();});
+$('#cvOuts').addEventListener('click',e=>{const b=e.target.closest('.copy');if(!b)return;
+  const el=$('#o-'+b.dataset.k);const t=el.textContent.replace(/[\s …]/g,'').replace('−','-');
+  const done=()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1200);};
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected';setTimeout(()=>b.textContent='Copy',1500);};
+  try{navigator.clipboard.writeText(t).then(done,fallback);}catch(err){fallback();}});
+regBuild();cvUpdate();
+
+/* ---------- Division ---------- */
+function buildDiv(){
+  const box=$('#dvBox'),b=clampBase($('#dvB').value),p=parseNum($('#dvN').value,10);
+  if(!p.ok||p.neg){box.innerHTML=`<p class="err">${p.ok?'Use a value of 0 or more here. Negative numbers are covered on the Signed numbers tab.':esc(p.err)}</p>`;say('dv','');return [];}
+  const B=BigInt(b),rows=[];let q=p.int;
+  if(q===0n)rows.push({n:0n,q:0n,r:0});
+  while(q>0n){rows.push({n:q,q:q/B,r:Number(q%B)});q/=B;}
+  const fr=[];let f=p.frac;
+  for(let i=0;i<10&&f>1e-12;i++){const prod=f*b;let d=Math.floor(prod+1e-9);if(d>=b)d=b-1;let rest=Math.max(0,prod-d);if(rest<1e-9)rest=0;fr.push({f,prod,d,rest});f=rest;}
+  const approx=f>0;
+  const intStr=rows.map(r=>DIG[r.r]).reverse().join('');
+  const fracStr=fr.map(r=>DIG[r.d]).join('');
+  const L=rows.length;
+  let h=`<div class="dv-grid"><div><h4>Integer part · divide by ${b}</h4><div class="tablewrap"><table class="steps" id="dvT1"><thead><tr><th>Divide</th><th>Quotient</th><th>Remainder</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{h+=`<tr class="pend" data-i="${i}"><td>${r.n} ÷ ${b}</td><td>${r.q}</td><td class="dig" style="--d:${(L-1-i)*140}ms"><span>${DIG[r.r]}</span>${r.r>9?` <small>(${r.r})</small>`:''}</td></tr>`;});
+  h+=`</tbody></table></div><p class="readdir pv" id="dvUp">↑ Read the remainders from bottom to top</p></div>`;
+  if(fr.length){
+    h+=`<div><h4>Fraction part · multiply by ${b}</h4><div class="tablewrap"><table class="steps" id="dvT2"><thead><tr><th>Multiply</th><th>Product</th><th>Digit</th></tr></thead><tbody>`;
+    fr.forEach((r,i)=>{h+=`<tr class="pend" data-i="${i}"><td>${fmtN(r.f)} × ${b}</td><td>${fmtN(r.prod)}</td><td class="dig" style="--d:${i*140}ms"><span>${DIG[r.d]}</span>${r.d>9?` <small>(${r.d})</small>`:''}</td></tr>`;});
+    h+=`</tbody></table></div><p class="readdir pv" id="dvDn">↓ Read the integer parts from top to bottom${approx?' (does not terminate; stopped after 10 digits)':''}</p></div>`;
+  }
+  h+=`</div><div class="result"><span>${esc($('#dvN').value.trim())}${sub(10)}</span><span>=</span><span class="rd">${[...intStr].map((c,j)=>`<span class="pv" data-ri style="--d:${j*140}ms">${c}</span>`).join('')}${fr.length?`<span class="pv" data-rf style="--d:0ms">.</span>${[...fracStr].map((c,j)=>`<span class="pv" data-rf style="--d:${(j+1)*140}ms">${c}</span>`).join('')}${approx?'<span class="pv" data-rf>…</span>':''}`:''}</span><span>${sub(b)}</span></div>`;
+  box.innerHTML=h;
+  say('dv','Press Play to watch the method, or ▶| to go one step at a time.');
+  const show=(t,i)=>{$$(`#${t} tr`).forEach(r=>r.classList.remove('now'));const r=$(`#${t} tr[data-i="${i}"]`);r.classList.remove('pend');r.classList.add('now');};
+  const steps=[];
+  rows.forEach((r,i)=>steps.push(()=>{show('dvT1',i);say('dv',`${r.n} ÷ ${b} = ${r.q}, remainder ${r.r}${r.r>9?` → digit ${DIG[r.r]}`:''}.${r.q===0n?' The quotient is 0, so the integer part is done.':' Carry the quotient down.'}`);}));
+  steps.push(()=>{$$('#dvT1 tr').forEach(r=>r.classList.remove('now'));$$('#dvT1 td.dig').forEach(t=>t.classList.add('lit'));$('#dvUp').classList.add('shown');$$('#dvBox [data-ri]').forEach(e=>e.classList.add('shown'));
+    say('dv',`The first remainder is the least significant digit, so read upward: ${intStr}${sub(b)}.`);});
+  fr.forEach((r,i)=>steps.push(()=>{show('dvT2',i);say('dv',`${fmtN(r.f)} × ${b} = ${fmtN(r.prod)}. The integer part ${r.d}${r.d>9?` (${DIG[r.d]})`:''} is the next digit; keep the fraction ${fmtN(r.rest)}.${r.rest===0?' The fraction reached 0, so stop.':''}`);}));
+  if(fr.length)steps.push(()=>{$$('#dvT2 tr').forEach(r=>r.classList.remove('now'));$$('#dvT2 td.dig').forEach(t=>t.classList.add('lit'));$('#dvDn').classList.add('shown');$$('#dvBox [data-rf]').forEach(e=>e.classList.add('shown'));
+    say('dv',`The first digit produced sits right after the point, so read downward: .${fracStr}${approx?'…':''}. Result: ${intStr}.${fracStr}${approx?'…':''}${sub(b)}.`);});
+  return steps;
+}
+const dvS=new Stepper($('#dvCtl'),$('#dvScope'),buildDiv);
+const dvLoad=debounce(()=>dvS.load());
+$('#dvN').addEventListener('input',dvLoad);
+$('#dvB').addEventListener('input',()=>{segSet('#dvSeg','b',clampBase($('#dvB').value));dvLoad();});
+segBind('#dvSeg','b',b=>{$('#dvB').value=b;dvS.load();});
+dvS.load();
+
+/* ---------- Expansion ---------- */
+function buildExp(){
+  const box=$('#exBox'),b=clampBase($('#exB').value);
+  const raw=$('#exN').value.trim().toUpperCase().replace(/[\s_]/g,'').replace(/^\+/,'');
+  const p=parseNum(raw,b);
+  if(!p.ok||p.neg){box.innerHTML=`<p class="err">${p.ok?'Use a value of 0 or more here.':esc(p.err)}</p>`;say('ex','');return [];}
+  let [ip,fp='']=raw.split('.');ip=ip||'0';
+  if(ip.length+fp.length>16){box.innerHTML='<p class="err">Keep it to 16 digits or fewer so every term fits on screen.</p>';say('ex','');return [];}
+  const cols=[...ip].map((ch,i)=>({ch,d:DIG.indexOf(ch),k:ip.length-1-i})).concat([...fp].map((ch,i)=>({ch,d:DIG.indexOf(ch),k:-(i+1)})));
+  cols.forEach(c=>{c.w=b**c.k;c.t=c.d*c.w;});
+  const cum=[];cols.reduce((a,c,i)=>(cum[i]=a+c.t),0);
+  const wlbl=k=>k<0?`1/${fmtN(b**-k)}`:fmtN(b**k);
+  let h='<div class="scroll"><div class="ex-row">';
+  cols.forEach((c,i)=>{h+=`${c.k===-1?'<div class="ex-pt">.</div>':''}<div class="ex-c" data-i="${i}"><div class="ex-d">${c.ch}</div><div class="ex-dv">${c.d>9?`= ${c.d}`:''}</div><div class="ex-w">${b}${sup(c.k)}</div><div class="ex-wv">${wlbl(c.k)}</div><div class="ex-t pv" data-t="${i}">${c.d} × ${wlbl(c.k)}<b>${fmtN(c.t)}</b></div></div>`;});
+  h+=`</div></div><div class="ex-sum"><div id="exExpr"></div><div class="ex-total">${esc(raw)}${sub(b)} = <b id="exTot">…</b>${sub(10)}</div></div>`;
+  box.innerHTML=h;
+  say('ex','Press Play to add up the place values one digit at a time.');
+  const steps=[];
+  cols.forEach((c,i)=>steps.push(()=>{
+    $$('#exBox .ex-c').forEach(e=>e.classList.toggle('now',+e.dataset.i===i));
+    $(`#exBox [data-t="${i}"]`).classList.add('shown');
+    $('#exExpr').textContent=cols.slice(0,i+1).map(x=>fmtN(x.t)).join(' + ');
+    $('#exTot').textContent=fmtN(cum[i]);
+    say('ex',`${c.ch}${c.d>9?` (= ${c.d})`:''} is in position ${c.k}, so it is worth ${c.d} × ${b}${sup(c.k)} = ${fmtN(c.t)}. Running total: ${fmtN(cum[i])}.`);}));
+  steps.push(()=>{$$('#exBox .ex-c').forEach(e=>e.classList.remove('now'));say('ex',`${raw}${sub(b)} = ${fmtN(cum[cols.length-1])}${sub(10)}.`);});
+  return steps;
+}
+const exS=new Stepper($('#exCtl'),$('#exScope'),buildExp);
+const exLoad=debounce(()=>exS.load());
+$('#exN').addEventListener('input',exLoad);
+$('#exB').addEventListener('input',()=>{segSet('#exSeg','b',clampBase($('#exB').value));exLoad();});
+segBind('#exSeg','b',b=>{$('#exB').value=b;exS.load();});
+exS.load();
+
+/* ---------- Grouping ---------- */
+const gr={mode:'toBase',b:16};
+function buildGr(){
+  const st=$('#grStage'),g=gr.b===8?3:4,B=gr.b,W=[...Array(g)].map((_,k)=>2**(g-1-k));
+  const raw=$('#grIn').value.trim().toUpperCase().replace(/[\s_]/g,'').replace(/^\+/,'');
+  const p=parseNum(raw,gr.mode==='toBase'?2:B);
+  if(!p.ok||p.neg){st.innerHTML=`<p class="err">${p.ok?'Use a value of 0 or more.':esc(p.err)}</p>`;say('gr','');return [];}
+  let [ip,fp='']=raw.split('.');ip=ip.replace(/^0+(?=.)/,'')||'0';
+  if(ip.length+fp.length>(gr.mode==='toBase'?40:12)){st.innerHTML=`<p class="err">That is a long one. Keep it to ${gr.mode==='toBase'?40:12} digits so it fits on screen.</p>`;say('gr','');return [];}
+  const expr=bits=>[...bits].map((c,k)=>c==='1'?W[k]:null).filter(x=>x!==null).join('+')||'0';
+  const cell=(c,extra='')=>`<span class="bit sm${c==='1'?' on':''}${extra}">${c}</span>`;
+  const steps=[];
+  say('gr','Press Play to watch the grouping.');
+  if(gr.mode==='toBase'){
+    const padL=(g-ip.length%g)%g,padR=fp?(g-fp.length%g)%g:0;
+    const I='0'.repeat(padL)+ip,F=fp+'0'.repeat(padR);
+    const chunk=s=>s.match(new RegExp(`.{${g}}`,'g'))||[];
+    const ig=chunk(I),fg=chunk(F),gs=[];
+    let h='<div class="scroll"><div class="gr-row" id="grRow">';
+    const mk=(bits,mask,gi)=>`<div class="grp"><div class="gbits">${[...bits].map((c,k)=>cell(c,mask[k]?' pad hide':'')).join('')}</div><div class="gval pv" data-g="${gi}">${expr(bits)}</div><div class="gdig pv" data-g="${gi}">${DIG[parseInt(bits,2)]}</div></div>`;
+    ig.forEach((bits,k)=>{gs.push(bits);h+=mk(bits,[...bits].map((_,t)=>k*g+t<padL),gs.length-1);});
+    if(fp){h+='<div class="gpt">.</div>';fg.forEach((bits,k)=>{gs.push(bits);h+=mk(bits,[...bits].map((_,t)=>k*g+t>=fp.length),gs.length-1);});}
+    h+='</div></div>';
+    const outI=ig.map(x=>DIG[parseInt(x,2)]).join('').replace(/^0+(?=.)/,'')||'0',outF=fg.map(x=>DIG[parseInt(x,2)]).join('');
+    const out=outI+(fp?'.'+outF:'');
+    h+=`<div class="result"><span>${ip}${fp?'.'+fp:''}${sub(2)}</span><span>=</span><span class="rd pv" id="grOut">${out}${sub(B)}</span></div>`;
+    st.innerHTML=h;
+    steps.push(()=>{$$('#grStage .bit.pad').forEach(x=>x.classList.remove('hide'));
+      say('gr',padL||padR?`Pad with zeros so every group is complete: ${padL} on the left${fp?` and ${padR} on the right`:''}. Leading and trailing zeros do not change the value.`:`The bits already split evenly into groups of ${g}, so no padding is needed.`);});
+    steps.push(()=>{$('#grRow').classList.add('split');say('gr',`Split into groups of ${g}, starting at the radix point and working outward (${B} = 2${sup(g)}).`);});
+    gs.forEach((bits,k)=>steps.push(()=>{$$(`#grStage [data-g="${k}"]`).forEach(e=>e.classList.add('shown'));const v=parseInt(bits,2);
+      say('gr',`${bits} → weights ${W.join(', ')} → ${expr(bits)} = ${v}${v>9?`, written ${DIG[v]}`:''}.`);}));
+    steps.push(()=>{$('#grOut').classList.add('shown');say('gr',`Read the digits left to right: ${ip}${fp?'.'+fp:''}${sub(2)} = ${out}${sub(B)}.`);});
+  }else{
+    const all=[...ip].map(c=>({c,f:false})).concat([...fp].map(c=>({c,f:true})));
+    let h='<div class="scroll"><div class="gr-row split">';
+    all.forEach((d,k)=>{const v=DIG.indexOf(d.c),bits=v.toString(2).padStart(g,'0');d.bits=bits;
+      if(d.f&&(k===0||!all[k-1].f))h+='<div class="gpt">.</div>';
+      h+=`<div class="grp"><div class="gdig">${d.c}</div><div class="gval pv" data-g="${k}">${v>9?`${v} = `:''}${expr(bits)}</div><div class="gbits pv" data-g="${k}">${[...bits].map(c=>cell(c)).join('')}</div></div>`;});
+    h+='</div></div>';
+    const bi=all.filter(d=>!d.f).map(d=>d.bits).join('').replace(/^0+(?=.)/,'')||'0';
+    const bf=all.filter(d=>d.f).map(d=>d.bits).join('').replace(/0+$/,'');
+    const out=bi+(bf?'.'+bf:'');
+    h+=`<div class="result"><span>${ip}${fp?'.'+fp:''}${sub(B)}</span><span>=</span><span class="rd pv" id="grOut">${out}${sub(2)}</span></div>`;
+    if(B===8)h+=`<p class="note" style="margin-top:10px">Octal → hex: regroup this binary result in fours (switch direction to “Binary → digits” and pick 16).</p>`;
+    st.innerHTML=h;
+    all.forEach((d,k)=>steps.push(()=>{$$(`#grStage [data-g="${k}"]`).forEach(e=>e.classList.add('shown'));const v=DIG.indexOf(d.c);
+      say('gr',`${d.c}${v>9?` = ${v}`:''} = ${expr(d.bits)} → ${d.bits}. Every ${B===8?'octal':'hex'} digit becomes exactly ${g} bits.`);}));
+    steps.push(()=>{$('#grOut').classList.add('shown');say('gr',`Join the groups and drop leading and trailing zeros: ${out}${sub(2)}.`);});
+  }
+  return steps;
+}
+const grS=new Stepper($('#grCtl'),$('#grScope'),buildGr);
+function grUI(){$('#grInLbl').textContent=gr.mode==='toBase'?'Binary number':(gr.b===8?'Octal number':'Hexadecimal number');segSet('#grMode','m',gr.mode);segSet('#grSeg','b',gr.b);}
+segBind('#grMode','m',m=>{const cur=$('#grIn').value;const p=parseNum(cur,gr.mode==='toBase'?2:gr.b);gr.mode=m;
+  if(p.ok&&!p.neg)$('#grIn').value=fmt(p,m==='toBase'?2:gr.b,12).replace('…','');grUI();grS.load();});
+segBind('#grSeg','b',b=>{const p=parseNum($('#grIn').value,gr.mode==='toBase'?2:gr.b);gr.b=+b;
+  if(gr.mode==='toBin'&&p.ok&&!p.neg)$('#grIn').value=fmt(p,gr.b,12).replace('…','');grUI();grS.load();});
+$('#grIn').addEventListener('input',debounce(()=>grS.load()));
+grUI();grS.load();
+
+/* ---------- Signed ---------- */
+const sg={n:8,v:-37};
+function repDefs(){const n=sg.n,h=2**(n-1);return [
+  {k:'sm',name:'Sign–magnitude',range:`−${h-1} … +${h-1}`,note:'MSB is the sign (1 = negative); the other bits hold |x|. Has both +0 and −0.',enc:v=>Math.abs(v)<=h-1?(v<0?'1':'0')+toBits(Math.abs(v),n-1):null,sign:true},
+  {k:'one',name:'1’s complement',range:`−${h-1} … +${h-1}`,note:'To negate, invert every bit. Also has two zeros: 00…0 and 11…1.',enc:v=>Math.abs(v)<=h-1?(v<0?inv(toBits(-v,n)):toBits(v,n)):null,sign:true},
+  {k:'two',name:'2’s complement',range:`−${h} … +${h-1}`,note:'To negate, invert every bit and add 1. Only one zero, and the same adder handles + and −.',enc:v=>toBits(v,n),sign:true},
+  {k:'ex',name:`Excess-${h}`,range:`−${h} … +${h-1}`,note:`Stored code = x + ${h}, so codes sort in value order. IEEE 754 exponents use the bias 2${sup(n-1)} − 1 instead.`,enc:v=>toBits(v+h,n),sign:false}];}
+function setBits(el,bits,{sign=false,sm=false,btn=false}={}){
+  if(el.children.length!==bits.length||el.dataset.btn!==String(btn)){el.dataset.btn=btn;
+    el.innerHTML=[...bits].map((_,i)=>btn?`<button type="button" class="bit" data-i="${i}" aria-label="Bit ${bits.length-1-i}"></button>`:'<span class="bit"></span>').join('');}
+  [...el.children].forEach((b,i)=>{const c=bits[i],was=b.textContent;b.textContent=c;
+    b.className='bit'+(c==='1'?' on':'')+(sign&&i===0?' sign':'')+(sm?' sm':'');
+    if(was&&was!==c){void b.offsetWidth;b.classList.add('flip');}});
+}
+let repN=0;
+function sgReps(){
+  const defs=repDefs();
+  if(repN!==sg.n){repN=sg.n;$('#sgReps').innerHTML=defs.map(d=>`<div class="rep"><div><div class="rep-name">${d.name}</div><div class="rep-range">range ${d.range}</div></div><div class="scroll"><div class="bits" data-rep="${d.k}"></div><p class="na" data-na="${d.k}" hidden></p></div><p class="rep-note">${d.note}</p></div>`).join('');}
+  defs.forEach(d=>{const code=d.enc(sg.v),bx=$(`[data-rep="${d.k}"]`),na=$(`[data-na="${d.k}"]`);
+    bx.hidden=!code;na.hidden=!!code;
+    if(code)setBits(bx,code,{sign:d.sign,sm:sg.n===16});else na.textContent=`Not representable: ${minus(sg.v)} is outside ${d.range}.`;});
+}
+function ipDraw(){
+  const n=sg.n,h=2**(n-1),pat=toBits(sg.v,n);
+  setBits($('#ipBits'),pat,{sign:true,btn:true});
+  $('#ipW').innerHTML=[...pat].map((_,i)=>{const k=n-1-i;return `<span>${n<=8?(i===0?'−'+2**k:2**k):(i===0?'−2'+sup(k):'2'+sup(k))}</span>`;}).join('');
+  const terms=[...pat].map((c,i)=>c==='1'?(i===0?-h:2**(n-1-i)):null).filter(x=>x!==null);
+  const formula=terms.length?terms.map((t,i)=>i===0?minus(t):(t<0?'− '+(-t):'+ '+t)).join(' ')+' = ':'';
+  const hex=uval(pat).toString(16).toUpperCase().padStart(n/4,'0');
+  $('#ipOut').innerHTML=`<dt>Unsigned</dt><dd>${uval(pat)}</dd><dt>Sign–magnitude</dt><dd>${fv(decSM(pat))}</dd><dt>1’s complement</dt><dd>${fv(dec1(pat))}</dd><dt>2’s complement</dt><dd>${minus(dec2(pat))} <small>${terms.length>1?formula.replace(/ = $/,''):''}</small></dd><dt>Excess-${h}</dt><dd>${minus(decEx(pat))}</dd><dt>Hex</dt><dd>${hex}${sub(16)}</dd>`;
+}
+$('#ipBits').addEventListener('click',e=>{const b=e.target.closest('.bit');if(!b)return;const n=sg.n,pat=toBits(sg.v,n),i=+b.dataset.i;
+  const np=pat.slice(0,i)+(pat[i]==='1'?'0':'1')+pat.slice(i+1);sg.v=dec2(np);sgAll();});
+function sxDraw(){
+  const n=sg.n,m=n*2,pat=toBits(sg.v,n),se=pat[0].repeat(m-n)+pat,ze='0'.repeat(m-n)+pat;
+  const row=(lbl,bits,val,ok)=>`<div class="lab">${lbl}</div><div class="bits">${[...bits].map((c,i)=>`<span class="bit sm${c==='1'?' on':''}${i<m-n?' ext':''}${i===0?' sign':''}">${c}</span>`).join('')}</div><div class="val ${ok?'okt':'badt'}">${minus(val)}</div>`;
+  $('#sxBox').innerHTML=`<div class="sx"><div class="lab">${n}-bit</div><div class="bits">${'<span class="bit sm" style="visibility:hidden"></span>'.repeat(m-n)}${[...pat].map((c,i)=>`<span class="bit sm${c==='1'?' on':''}${i===0?' sign':''}">${c}</span>`).join('')}</div><div class="val">${minus(sg.v)}</div>${row('Sign-extend',se,dec2(se),true)}${row('Zero-extend',ze,dec2(ze),dec2(ze)===sg.v)}</div>`;
+  $('#sxNote').textContent=sg.v<0?`Zero-extension turns ${minus(sg.v)} into ${dec2(ze)}. Copying the sign bit keeps the value: the new −2${sup(m-1)} weight plus the old bits still add up to ${minus(sg.v)}.`:'For a non-negative value the sign bit is 0, so both methods give the same result. Try a negative value.';
+}
+function sgAll(){
+  const n=sg.n,h=2**(n-1);sg.v=Math.max(-h,Math.min(h-1,sg.v));
+  const sl=$('#sgV');sl.min=-h;sl.max=h-1;sl.value=sg.v;const nb=$('#sgVn');nb.min=-h;nb.max=h-1;if(+nb.value!==sg.v)nb.value=sg.v;
+  sgReps();ipDraw();sxDraw();tcS.load();
+}
+function buildTc(){
+  const n=sg.n,v=sg.v,box=$('#tcBox');
+  if(v>=0){box.innerHTML=`<p class="note" style="margin:0">${v} is not negative, so its 2’s complement code is simply its binary, <span class="mono">${toBits(v,n)}</span>. Choose a negative value above to see the steps.</p>`;say('tc','');return [];}
+  const m=-v,h=2**(n-1),mag=toBits(m,n),iv=inv(mag),res=toBits(v,n),k=mag.lastIndexOf('1'),one='0'.repeat(n-1)+'1',sm=n===16;
+  const bitsRow=(bits,s,extra=()=> '')=>`<div class="bits pv" data-s="${s}">${[...bits].map((c,i)=>`<span class="bit${sm?' sm':''}${c==='1'?' on':''}${i===0?' sign':''}${extra(i)}" data-ri="${i}">${c}</span>`).join('')}</div>`;
+  box.innerHTML=`<div class="tcg"><div class="lab">|x| = ${m}</div>${bitsRow(mag,1)}<div class="lab">invert</div>${bitsRow(iv,2)}<div class="lab">+ 1</div>${bitsRow(one,3)}<div></div><div class="rule pv" data-s="3"></div><div class="lab">= ${minus(v)}</div><div class="bits pv" id="tcRes" data-s="3">${[...res].map((c,i)=>`<span class="bit${sm?' sm':''}${c==='1'?' on':''}${i===0?' sign':''}" data-ri="${i}">${c}</span>`).join('')}</div></div>`;
+  say('tc','Press Play to negate the magnitude step by step.');
+  const showS=s=>$$(`#tcBox [data-s="${s}"]`).forEach(e=>e.classList.add('shown'));
+  return [
+    ()=>{showS(1);say('tc',`Write the magnitude ${m} in ${n} bits: ${mag}.`);},
+    ()=>{showS(2);say('tc',`Invert every bit: ${iv}. This is the 1’s complement of ${m}.`);},
+    ()=>{showS(3);say('tc',`Add 1: ${iv} + 1 = ${res}. That is ${minus(v)} in 2’s complement.`);},
+    ()=>{$$('#tcRes .bit').forEach((b,i)=>b.classList.toggle('keep',i>=k));
+      say('tc',`Shortcut: from the right, copy every bit up to and including the first 1 (${mag.slice(k)}), then invert the rest. Check with the MSB weight: −${h} + ${uval(res.slice(1))} = ${minus(v)}.`);}];
+}
+const tcS=new Stepper($('#tcCtl'),$('#tcScope'),buildTc);
+segBind('#sgN','n',n=>{sg.n=+n;sgAll();});
+$('#sgV').addEventListener('input',e=>{sg.v=+e.target.value;sgAll();});
+$('#sgVn').addEventListener('change',e=>{const x=parseInt(e.target.value,10);if(!isNaN(x)){sg.v=x;sgAll();}});
+
+/* wheel */
+const wh={s:'two',pos:5,rot:5*22.5};
+const b4=i=>i.toString(2).padStart(4,'0');
+const WV=i=>{const s=wh.s;if(s==='un')return i;if(s==='two')return i<8?i:i-16;if(s==='sm')return i<8?i:(i===8?'−0':-(i-8));return i<8?i:(i===15?'−0':-(15-i));};
+function wheelDraw(){
+  const cx=180,cy=180,R=116,RL=152,rad=d=>d*Math.PI/180;
+  const seam=wh.s==='un'?15.5:7.5,sa=rad(-90+seam*22.5);
+  let s=`<svg viewBox="0 0 360 360" role="group" aria-label="4-bit number wheel"><circle cx="${cx}" cy="${cy}" r="${R}" class="wring"/>`;
+  s+=`<line class="seam" x1="${cx+34*Math.cos(sa)}" y1="${cy+34*Math.sin(sa)}" x2="${cx+(RL+14)*Math.cos(sa)}" y2="${cy+(RL+14)*Math.sin(sa)}"/>`;
+  const lx=cx+66*Math.cos(sa),ly=cy+66*Math.sin(sa);
+  s+=`<text class="seamlbl" x="${lx+(wh.s==='un'?-30:12)}" y="${ly+(wh.s==='un'?-6:16)}" text-anchor="middle">OVERFLOW</text>`;
+  s+=`<g class="ptrg" id="whPtr" style="transform:rotate(${wh.rot}deg)"><line class="ptr" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy-R+24}"/><circle class="hub" cx="${cx}" cy="${cy}" r="6"/></g>`;
+  for(let i=0;i<16;i++){const a=rad(-90+i*22.5),x=cx+R*Math.cos(a),y=cy+R*Math.sin(a),px=cx+RL*Math.cos(a),py=cy+RL*Math.sin(a),v=WV(i),neg=typeof v==='string'||v<0;
+    s+=`<g class="wn${i===wh.pos?' sel':''}${neg?' neg':''}" data-i="${i}" tabindex="0" role="button" aria-label="Pattern ${b4(i)}, value ${fv(v)}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17"/><text class="v" x="${x.toFixed(1)}" y="${y.toFixed(1)}" dy=".35em" text-anchor="middle">${fv(v)}</text><text class="p" x="${px.toFixed(1)}" y="${py.toFixed(1)}" dy=".35em" text-anchor="middle">${b4(i)}</text></g>`;}
+  $('#wheel').innerHTML=s+'</svg>';
+}
+function wheelMove(d,absolute){
+  const from=wh.pos,to=absolute!==undefined?absolute:((from+d)%16+16)%16;
+  let delta=((to-from)%16+16)%16;if(delta>8)delta-=16;if(absolute===undefined)delta=d;
+  wh.rot+=delta*22.5;wh.pos=to;
+  $('#whPtr').style.transform=`rotate(${wh.rot}deg)`;
+  $$('#wheel .wn').forEach(g=>g.classList.toggle('sel',+g.dataset.i===to));
+  const msg=$('#whMsg');
+  if(absolute!==undefined){msg.className='wmsg';msg.textContent=`${b4(to)} reads as ${fv(WV(to))} in ${({un:'unsigned',sm:'sign–magnitude',one:'1’s complement',two:'2’s complement'})[wh.s]}.`;return;}
+  const seamA=wh.s==='un'?15:7;
+  const crossed=(d>0&&from===seamA)||(d<0&&from===(seamA+1)%16);
+  if(crossed&&(wh.s==='un'||wh.s==='two')){msg.className='wmsg ovf';msg.textContent=`Overflow: ${b4(from)} ${d>0?'+':'−'} 1 wraps to ${b4(to)}, which reads as ${fv(WV(to))}, not ${fv(WV(from)+d)}.`;}
+  else if(crossed){msg.className='wmsg ovf';msg.textContent=`Crossed the sign boundary: ${b4(from)} → ${b4(to)} reads as ${fv(WV(from))} → ${fv(WV(to))}.`;}
+  else{msg.className='wmsg';const note=(wh.s==='sm'&&to>=8&&from>=8)?' In sign–magnitude, counting the pattern up moves negative values the wrong way.':(wh.s==='one'&&((from===15&&to===0)||(from===0&&to===15)))?' Two patterns mean zero here.':'';
+    msg.textContent=`${b4(from)} ${d>0?'+':'−'} 1 = ${b4(to)}: ${fv(WV(from))} → ${fv(WV(to))}.${note}`;}
+}
+$('#wheel').addEventListener('click',e=>{const g=e.target.closest('.wn');if(g)wheelMove(0,+g.dataset.i);});
+$('#wheel').addEventListener('keydown',e=>{const g=e.target.closest('.wn');if(g&&(e.key==='Enter'||e.key===' ')){e.preventDefault();wheelMove(0,+g.dataset.i);}});
+$('#whInc').addEventListener('click',()=>wheelMove(1));
+$('#whDec').addEventListener('click',()=>wheelMove(-1));
+segBind('#whScheme','s',s=>{wh.s=s;wheelDraw();$('#whMsg').className='wmsg';$('#whMsg').textContent='Click a pattern or use ±1.';});
+wheelDraw();sgAll();
+
+/* ---------- Arithmetic ---------- */
+const ar={n:4,s:'two',op:'+'};
+const PRE=[{A:6,op:'+',B:3,t:'6 + 3'},{A:5,op:'+',B:2,t:'5 + 2'},{A:3,op:'-',B:5,t:'3 − 5'},{A:-4,op:'+',B:-3,t:'−4 + −3'},{A:-6,op:'-',B:4,t:'−6 − 4'},{A:7,op:'+',B:-7,t:'7 + −7'}];
+$('#arPre').innerHTML=PRE.map((p,i)=>`<button type="button" class="chip" data-i="${i}">${p.t}</button>`).join('');
+$('#arPre').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const p=PRE[+b.dataset.i];
+  ar.n=4;if(ar.s==='un'&&(p.A<0||p.B<0))ar.s='two';ar.op=p.op;$('#arA').value=p.A;$('#arB').value=p.B;segSet('#arN','n',4);segSet('#arSch','s',ar.s);segSet('#arOp','o',ar.op);arS.replay();});
+function buildAr(){
+  const n=ar.n,mask=2**n-1,h=2**(n-1),box=$('#arBox');
+  const A=parseInt($('#arA').value,10),B=parseInt($('#arB').value,10),sub_=ar.op==='-';
+  const SN={two:'2’s complement',one:'1’s complement',un:'unsigned'}[ar.s];
+  const R=ar.s==='un'?{min:0,max:mask}:ar.s==='two'?{min:-h,max:h-1}:{min:-(h-1),max:h-1};
+  const err=t=>{$('#arErr').textContent=t;box.innerHTML='';say('ar','');return [];};
+  if(isNaN(A)||isNaN(B))return err('Enter whole numbers for A and B.');
+  for(const [nm,x] of [['A',A],['B',B]])if(x<R.min||x>R.max)return err(`${nm} = ${minus(x)} does not fit: ${n}-bit ${SN} holds ${minus(R.min)} to ${R.max}.`);
+  $('#arErr').textContent='';
+  const enc=v=>ar.s==='one'&&v<0?(~(-v))&mask:((v%(mask+1))+(mask+1))%(mask+1);
+  const a=enc(A),b=enc(B),be=sub_?(~b)&mask:b,cin=sub_&&ar.s!=='one'?1:0;
+  const c=[cin],s=[],T=[];
+  for(let i=0;i<n;i++){const t=((a>>i)&1)+((be>>i)&1)+c[i];T[i]=t;s[i]=t&1;c[i+1]=t>>1;}
+  const sum=s.reduce((acc,x,i)=>acc|(x<<i),0),eac=ar.s==='one'&&c[n]===1,fin=eac?(sum+1)&mask:sum;
+  const BS=x=>toBits(x,n),signed=ar.s!=='un';
+  const dec=ar.s==='un'?fin:ar.s==='two'?dec2(BS(fin)):dec1(BS(fin));
+  const truth=sub_?A-B:A+B;
+  const C=c[n],V=c[n-1]^c[n],N=(fin>>(n-1))&1,Z=fin===0?1:0;
+  const ovf=ar.s==='un'?(sub_?C===0:C===1):ar.s==='two'?V===1:(truth<R.min||truth>R.max);
+  const sm=n>8?' sm':'';
+  const bitCell=(x,col,extra='',attr='')=>`<span class="bit${sm}${x?' on':''}${signed&&col===n-1?' sign':''}${extra}"${attr}>${x}</span>`;
+  const row=(lab,fn,rc='')=>{let r=`<div class="lab">${lab}</div>`;for(let col=n;col>=0;col--)r+=`<div class="ac ${rc}" data-col="${col}">${fn(col)}</div>`;return r;};
+  let g=`<div class="scroll"><div class="ag" style="grid-template-columns:auto repeat(${n+1},${n>8?'1.85rem':'2.2rem'})">`;
+  g+=row('',col=>col===n?'out':col,'hd');
+  g+=row('Carry',col=>`<span class="pv${col===0&&!sub_?' shown':''}" data-c="${col}">${c[col]}</span>`,'carry');
+  g+=row(`A = ${minus(A)}`,col=>col===n?'':bitCell((a>>col)&1,col));
+  g+=row(`B = ${minus(B)}`,col=>col===n?'':bitCell((b>>col)&1,col),'rB');
+  if(sub_)g+=row(ar.s==='one'?'¬B (= −B)':'¬B',col=>col===n?'':bitCell((be>>col)&1,col,' pv nb'));
+  g+=`<div></div><div class="rule"></div>`;
+  g+=row(eac?'Sum':'Result',col=>col===n?'':bitCell(s[col],col,' pv',` data-s="${col}"`));
+  if(eac){g+=row('+ end-around',col=>col===0?bitCell(1,0,' pv ea'):'');g+=`<div></div><div class="rule pv ea"></div>`;g+=row('Result',col=>col===n?'':bitCell((fin>>col)&1,col,' pv ea'));}
+  g+='</div></div>';
+  const flag=(k,v,t,d)=>`<div class="flag${v?' set':''}"><span class="fl">${k}</span><span>${t} = ${v}<small>${d}</small></span></div>`;
+  g+=`<div class="flags pv" id="arFlags">${flag('C',C,'Carry out','carry from the MSB')}${flag('V',V,'Overflow','C₍ₙ₋₁₎ ⊕ Cₙ, signed')}${flag('N',N,'Negative','copy of the MSB')}${flag('Z',Z,'Zero','all result bits 0')}</div>`;
+  let vtxt;
+  const eq=`${minus(A)} ${sub_?'−':'+'} ${minus(B)} = ${minus(truth)}`;
+  if(ar.s==='two')vtxt=ovf?`<span class="badt">Overflow.</span> ${eq}, which is outside ${minus(R.min)} … ${R.max}. The bits ${BS(fin)} read as ${minus(dec)}. Carry into the MSB (${c[n-1]}) differs from carry out (${c[n]}), so V = 1.`
+    :`<span class="okt">Correct.</span> ${BS(fin)} reads as ${minus(dec)} in 2’s complement, and ${eq}.${C?' The carry out C = 1 is simply discarded; for signed numbers only V matters.':''}`;
+  else if(ar.s==='one')vtxt=ovf?`<span class="badt">Overflow.</span> ${eq} is outside ${minus(R.min)} … ${R.max}, so the ${n}-bit result ${BS(fin)} (${fv(dec)}) is wrong.`
+    :`<span class="okt">Correct.</span> ${BS(fin)} reads as ${fv(dec)} in 1’s complement, and ${eq}.${eac?' The carry out was added back in at bit 0: the end-around carry.':''}${dec==='−0'?' 11…1 is negative zero in this scheme.':''}`;
+  else vtxt=sub_?(ovf?`<span class="badt">Borrow.</span> C = 0 means B > A, so ${eq} cannot be shown as an unsigned number. The bits read as ${dec}.`:`<span class="okt">Correct.</span> ${BS(fin)} = ${dec} and ${eq}. In subtraction, C = 1 means no borrow.`)
+    :(ovf?`<span class="badt">Carry out.</span> ${eq} needs ${n+1} bits; the ${n}-bit result ${BS(fin)} = ${dec} lost the top bit (C = 1).`:`<span class="okt">Correct.</span> ${BS(fin)} = ${dec} and ${eq}.`);
+  g+=`<div class="verdict pv ${ovf?'bad':'ok'}" id="arVer">${vtxt}</div>`;
+  box.innerHTML=g;
+  say('ar','Press Play to run the adder from the least significant bit.');
+  const setCol=i=>$$('#arBox .ac').forEach(e=>e.classList.toggle('col-on',+e.dataset.col===i&&!e.classList.contains('hd')));
+  const steps=[];
+  if(sub_)steps.push(()=>{$$('#arBox .nb').forEach(e=>e.classList.add('shown'));$$('#arBox .rB').forEach(e=>e.classList.add('dimB'));
+    if(cin)$('#arBox [data-c="0"]').classList.add('shown');
+    say('ar',ar.s==='one'?`In 1’s complement, −B is just ¬B = ${BS(be)}. The carry-in stays 0.`:`Turn subtraction into addition: A − B = A + ¬B + 1. Invert B to ${BS(be)} and set the carry-in to 1.`);});
+  for(let i=0;i<n;i++){const ai=(a>>i)&1,bi=(be>>i)&1;steps.push(()=>{setCol(i);$(`#arBox [data-s="${i}"]`).classList.add('shown');$(`#arBox [data-c="${i+1}"]`).classList.add('shown');
+    say('ar',`Bit ${i}: ${ai} + ${bi} + carry ${c[i]} = ${T[i]}${T[i]>1?` (${T[i].toString(2)}₂)`:''} → write ${s[i]}, carry ${c[i+1]}${i===n-1?' out of the MSB':''}.`);});}
+  if(eac)steps.push(()=>{setCol(0);$$('#arBox .ea').forEach(e=>e.classList.add('shown'));say('ar',`The carry out was 1. In 1’s complement it wraps around and is added at bit 0: ${BS(sum)} + 1 = ${BS(fin)}.`);});
+  steps.push(()=>{setCol(-1);$('#arFlags').classList.add('shown');$('#arVer').classList.add('shown');
+    say('ar',`Done: ${BS(fin)}. Flags C=${C}, V=${V}, N=${N}, Z=${Z}.`);});
+  return steps;
+}
+const arS=new Stepper($('#arCtl'),$('#arScope'),buildAr);
+segBind('#arN','n',n=>{ar.n=+n;arS.load();});
+segBind('#arSch','s',s=>{ar.s=s;arS.load();});
+segBind('#arOp','o',o=>{ar.op=o;arS.load();});
+$('#arA').addEventListener('input',debounce(()=>arS.load()));
+$('#arB').addEventListener('input',debounce(()=>arS.load()));
+arS.load();
+
+/* ---------- Practice ---------- */
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const M=t=>`<span class="mono">${t}</span>`;
+function goDiv(n,b){$('#dvN').value=n;$('#dvB').value=b;segSet('#dvSeg','b',b);switchTab('divide');dvS.replay();}
+function goExp(s,b){$('#exN').value=s;$('#exB').value=b;segSet('#exSeg','b',b);switchTab('expand');exS.replay();}
+function goGr(m,b,s){gr.mode=m;gr.b=b;$('#grIn').value=s;grUI();switchTab('group');grS.replay();}
+function goSg(v,n,scroll){sg.n=n;sg.v=v;segSet('#sgN','n',n);sgAll();switchTab('signed');tcS.replay();if(scroll)$('#tcScope').scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});}
+const PQ=[
+  {k:'d2b',l:'Decimal → binary',g(){const n=ri(9,255);return {q:`Convert ${M(n+sub(10))} to binary.`,base:2,val:n,ans:n.toString(2),how:()=>goDiv(n,2)};}},
+  {k:'b2d',l:'Binary → decimal',g(){const n=ri(9,255),s=n.toString(2);return {q:`Convert ${M(s+sub(2))} to decimal.`,base:10,val:n,ans:String(n),how:()=>goExp(s,2)};}},
+  {k:'d2h',l:'Decimal → hex',g(){const n=ri(100,4095);return {q:`Convert ${M(n+sub(10))} to hexadecimal.`,base:16,val:n,ans:n.toString(16).toUpperCase(),how:()=>goDiv(n,16)};}},
+  {k:'h2d',l:'Hex → decimal',g(){const n=ri(30,4095),s=n.toString(16).toUpperCase();return {q:`Convert ${M(s+sub(16))} to decimal.`,base:10,val:n,ans:String(n),how:()=>goExp(s,16)};}},
+  {k:'d2o',l:'Decimal → octal',g(){const n=ri(20,511);return {q:`Convert ${M(n+sub(10))} to octal.`,base:8,val:n,ans:n.toString(8),how:()=>goDiv(n,8)};}},
+  {k:'b2h',l:'Binary → hex',g(){const n=ri(64,4095),s=n.toString(2);return {q:`Convert ${M(s+sub(2))} to hexadecimal.`,base:16,val:n,ans:n.toString(16).toUpperCase(),how:()=>goGr('toBase',16,s)};}},
+  {k:'b2o',l:'Binary → octal',g(){const n=ri(64,4095),s=n.toString(2);return {q:`Convert ${M(s+sub(2))} to octal.`,base:8,val:n,ans:n.toString(8),how:()=>goGr('toBase',8,s)};}},
+  {k:'h2b',l:'Hex → binary',g(){const n=ri(32,4095),s=n.toString(16).toUpperCase();return {q:`Convert ${M(s+sub(16))} to binary.`,base:2,val:n,ans:n.toString(2),how:()=>goGr('toBin',16,s)};}},
+  {k:'o2h',l:'Octal → hex',g(){const n=ri(64,4095),s=n.toString(8);return {q:`Convert ${M(s+sub(8))} to hexadecimal.`,base:16,val:n,ans:n.toString(16).toUpperCase(),how:()=>goGr('toBin',8,s)};}},
+  {k:'f2b',l:'Decimal fraction → binary',g(){const n=ri(1,31)+ri(1,7)/8;return {q:`Convert ${M(n+sub(10))} to binary.`,base:2,val:n,ans:fmt(parseNum(String(n),10),2),how:()=>goDiv(n,2)};}},
+  {k:'neg',l:'Negative → 8-bit 2’s comp',g(){const m=ri(1,128),code=toBits(-m,8);return {q:`Write ${M('−'+m)} as an 8-bit 2’s complement number.`,base:2,val:uval(code),ans:code,bits:8,how:()=>goSg(-m,8,true)};}},
+  {k:'pat',l:'8-bit 2’s comp → decimal',g(){const p='1'+toBits(ri(0,127),7),v=dec2(p);return {q:`What decimal value does the 8-bit 2’s complement pattern ${M(p)} represent?`,base:10,val:v,ans:minus(v),how:()=>goSg(v,8,false)};}},
+];
+$('#pqType').innerHTML='<option value="mix">Mixed</option>'+PQ.map(p=>`<option value="${p.k}">${p.l}</option>`).join('');
+const pq={cur:null,right:0,tries:0,streak:0,answered:false};
+function pqScore(){$('#pqScore').innerHTML=`<div><span>Correct</span>${pq.right} / ${pq.tries}</div><div><span>Streak</span>${pq.streak}</div>`;}
+function pqNew(){const t=$('#pqType').value;const def=t==='mix'?PQ[ri(0,PQ.length-1)]:PQ.find(p=>p.k===t);pq.cur=def.g();pq.answered=false;
+  $('#pqQ').innerHTML=pq.cur.q;$('#pqAns').value='';$('#pqFb').textContent='';$('#pqFb').className='fb';}
+$('#pqForm').addEventListener('submit',e=>{e.preventDefault();const q=pq.cur;let s=$('#pqAns').value.trim().replace(/[₀-₉]/g,'');
+  if(!s){$('#pqFb').className='fb bad';$('#pqFb').textContent='Type an answer first.';return;}
+  if(q.base===2)s=s.replace(/^0b/i,'');if(q.base===16)s=s.replace(/^0x/i,'');if(q.base===8)s=s.replace(/^0o/i,'');
+  const p=parseNum(s,q.base);
+  if(!p.ok){$('#pqFb').className='fb bad';$('#pqFb').textContent=p.err;return;}
+  const v=(p.neg?-1:1)*(Number(p.int)+p.frac);
+  const lenOk=!q.bits||s.replace(/\s/g,'').length===q.bits;
+  const ok=Math.abs(v-q.val)<1e-9&&lenOk;
+  if(!pq.answered){pq.tries++;if(ok){pq.right++;pq.streak++;}else pq.streak=0;pq.answered=true;}
+  $('#pqFb').className='fb '+(ok?'ok':'bad');
+  $('#pqFb').textContent=ok?`Correct: ${q.ans}. Press “Next question” for another.`:(Math.abs(v-q.val)<1e-9&&!lenOk?`Right value, but give all ${q.bits} bits: ${q.ans}.`:`Not quite. The answer is ${q.ans}. “Show me how” walks through it.`);
+  pqScore();});
+$('#pqNext').addEventListener('click',pqNew);
+$('#pqType').addEventListener('change',pqNew);
+$('#pqHow').addEventListener('click',()=>pq.cur&&pq.cur.how());
+pqScore();pqNew();
+
+switchTab((location.hash||'').slice(1)||'convert');
+window.scrollTo(0,0);
+})();
+</script>
+
+</body></html>
