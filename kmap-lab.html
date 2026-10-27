@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive Karnaugh-map trainer for 2 to 4 variables: step-by-step SOP/POS simplification with prime and essential implicants, and a practice mode that grades students' groups.">
+<meta name="author" content="Esam A. Al-Qaralleh">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>K-Map Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: function setup + truth table (left) · Karnaugh map as the hero (centre) · Learn steps or Practice grader (right).
+   Same lab-bench family as the PIC labs; one-screen stage on landscape displays. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --panel-2:#f6f8fa; --ink:#132033; --muted:#5a6879; --rule:#d5dce4; --grid:#c9d2dc;
+  --one:#0b5cad; --zero:#8995a3; --dc:#9c36b5; --accent:#0b5cad; --ok:#2b8a3e; --bad:#c92a2a; --warn:#b35c00; --sel:#f59f00;
+  --warn-bg:#fff4e0; --ok-bg:#ebfbee; --bad-bg:#fff0f0;
+  --display:'IBM Plex Sans Condensed','Arial Narrow',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e131a; --panel:#151c26; --panel-2:#1b2431; --ink:#e4eaf2; --muted:#93a1b3; --rule:#2a3546; --grid:#34435a;
+  --one:#6cb2ff; --zero:#6f7d90; --dc:#da77f2; --accent:#6cb2ff; --ok:#69db7c; --bad:#ff8787; --warn:#ffc078; --sel:#ffc53d;
+  --warn-bg:#2d2310; --ok-bg:#12261a; --bad-bg:#2c1416; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --panel:#151c26; --panel-2:#1b2431; --ink:#e4eaf2; --muted:#93a1b3; --rule:#2a3546; --grid:#34435a;
+  --one:#6cb2ff; --zero:#6f7d90; --dc:#da77f2; --accent:#6cb2ff; --ok:#69db7c; --bad:#ff8787; --warn:#ffc078; --sel:#ffc53d;
+  --warn-bg:#2d2310; --ok-bg:#12261a; --bad-bg:#2c1416; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+.app{max-width:1400px;margin:0 auto;padding-block:18px 36px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:14px}
+.top h1{font-size:clamp(28px,4vw,36px);font-weight:700;line-height:1}
+.top h1 span{color:var(--accent)}
+.kicker{font:600 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr) 400px;gap:14px;align-items:start}
+.col{display:grid;gap:14px;align-content:start;min-width:0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;min-width:0}
+.card-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 14px;border-bottom:1px solid var(--rule)}
+.card-h h2{font-size:18px;font-weight:600}
+.sub{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pad{padding:12px 14px 14px;display:grid;gap:12px}
+.lbl{font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:4px;display:block}
+.seg{display:flex;flex-wrap:wrap;gap:5px}
+.seg button{border:1px solid var(--rule);background:var(--panel-2);border-radius:6px;padding:5px 11px;font-size:13.5px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.seg button:hover{border-color:var(--accent)}
+.btn{border:1px solid var(--rule);background:var(--panel-2);border-radius:6px;padding:6px 12px;font-size:13.5px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn[disabled]{opacity:.45;cursor:default}
+.row2{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fld{display:flex;align-items:center;gap:6px;font:500 14px var(--mono)}
+.fld input{flex:1;min-width:0;border:1px solid var(--rule);background:var(--panel-2);border-radius:6px;padding:6px 8px;font:14px var(--mono)}
+.err{color:var(--bad);font-size:13px;min-height:1em}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+
+/* truth table */
+.tt-wrap{max-height:430px;overflow-y:auto}
+table.tt{border-collapse:collapse;width:100%;font:13px var(--mono);font-variant-numeric:tabular-nums}
+.tt th{position:sticky;top:0;background:var(--panel-2);font-weight:600;padding:5px 6px;border-bottom:1px solid var(--rule);text-align:center}
+.tt td{padding:3px 6px;text-align:center;border-bottom:1px solid var(--rule)}
+.tt td.m{color:var(--muted);text-align:right;padding-right:10px}
+.tt td.f{font-weight:700;cursor:pointer}
+.tt tr.hl td{background:color-mix(in srgb,var(--sel) 16%,transparent)}
+.v1{color:var(--one)}.v0{color:var(--zero)}.vx{color:var(--dc)}
+
+/* map */
+.mapcard .card-h .canon{font:500 13.5px var(--mono);color:var(--muted)}
+.mapwrap{padding:10px 14px 6px;display:flex;justify-content:center}
+#kmap{width:100%;max-width:720px;height:auto;display:block;user-select:none;-webkit-user-select:none;touch-action:none}
+#kmap text{font-family:var(--mono);fill:var(--ink)}
+#kmap .hdr{font-size:20px;font-weight:600}
+#kmap .vname{font-size:22px;font-weight:700;fill:var(--accent)}
+#kmap .mi{font-size:13px;fill:var(--muted)}
+#kmap .val{font-size:38px;font-weight:600;text-anchor:middle;dominant-baseline:central}
+#kmap .cell{fill:var(--panel);stroke:var(--grid);stroke-width:1.5;cursor:pointer}
+#kmap .cell:hover{fill:var(--panel-2)}
+#kmap .cell.sel{fill:color-mix(in srgb,var(--sel) 26%,var(--panel))}
+#kmap .cell.hl{fill:color-mix(in srgb,var(--sel) 14%,var(--panel))}
+#kmap .bar{stroke:var(--accent);stroke-width:3;stroke-linecap:round}
+#kmap .barl{font-size:17px;font-weight:700;fill:var(--accent)}
+#kmap .loop{fill-opacity:.11;stroke-width:3.4}
+#kmap .loop.faint{stroke-opacity:.28;fill-opacity:.04}
+#kmap .loop.enter{animation:pop .45s ease-out}
+#kmap .loop.bad{stroke-dasharray:7 6}
+#kmap .star{font-size:22px;fill:var(--sel);font-weight:700}
+@keyframes pop{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:none}}
+#kmap .loopg{transform-box:fill-box;transform-origin:center}
+.exprbar{padding:10px 14px 14px;border-top:1px solid var(--rule);display:grid;gap:6px}
+.expr{font:600 20px var(--mono);line-height:1.5;word-break:break-word}
+.expr .ol{display:inline-block;text-decoration:overline;text-decoration-thickness:2px;text-underline-offset:0;margin:0 .07em}
+.expr .t{white-space:nowrap}
+.expr.muted{color:var(--muted);font-weight:500;font-size:15px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font:500 12px var(--mono);color:var(--muted)}
+
+/* steps + practice */
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.steps li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;padding:7px 8px;border:1px solid transparent;border-radius:7px;font-size:13.8px;color:var(--muted);cursor:pointer}
+.steps li .n{font:600 12px var(--mono);text-align:center;padding:2px 0;border-radius:4px;background:var(--panel-2);border:1px solid var(--rule);height:fit-content}
+.steps li.done{color:var(--ink)}
+.steps li.cur{color:var(--ink);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+.steps li.cur .n{background:var(--accent);border-color:var(--accent);color:#fff}
+.steps .expr{font-size:15px}
+.steplist{max-height:470px;overflow-y:auto;padding-right:2px}
+.groups{list-style:none;margin:0;padding:0;display:grid;gap:5px;max-height:240px;overflow-y:auto}
+.groups li{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--rule);border-radius:6px;font-size:13.5px}
+.groups .sw{width:14px;height:14px;border-radius:3px;flex:none}
+.groups .expr{font-size:15px;flex:1}
+.groups .x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 4px}
+.groups .x:hover{color:var(--bad)}
+.groups li.np{border-color:var(--warn)}
+.fb{border-radius:7px;padding:9px 11px;font-size:13.8px;display:none}
+.fb.show{display:block}
+.fb.ok{background:var(--ok-bg);color:var(--ink);border:1px solid var(--ok)}
+.fb.bad{background:var(--bad-bg);color:var(--ink);border:1px solid var(--bad)}
+.fb.warn{background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn)}
+.score{font:600 13px var(--mono);color:var(--muted)}
+.score b{color:var(--ink)}
+.rules{margin:0;padding-left:18px;font-size:13px;color:var(--muted)}
+.rules li{margin:2px 0}
+
+@media (max-width:1180px){html:not(.fit) .grid{grid-template-columns:1fr 1fr}html:not(.fit) .col{display:contents}
+  html:not(.fit) .o-map{grid-column:1/-1;order:1}html:not(.fit) .o-side{order:2}html:not(.fit) .o-fn{order:3}html:not(.fit) .o-tt{order:4}}
+@media (max-width:720px){html:not(.fit) .grid{grid-template-columns:1fr}}
+
+/* ===== One-screen mode: whole lab on a 1600×900 stage, scaled to the window ===== */
+html.fit,html.fit body{height:100%;overflow:hidden}
+html.fit .app{position:fixed;left:0;top:0;width:1600px;height:900px;max-width:none;margin:0;padding:14px 16px;transform-origin:0 0;display:flex;flex-direction:column;gap:10px}
+html.fit .top{margin:0;flex:none}
+html.fit .grid{flex:1;min-height:0;grid-template-columns:350px minmax(0,1fr) 430px;grid-template-rows:minmax(0,1fr);align-items:stretch}
+html.fit .col{min-height:0;grid-template-rows:auto minmax(0,1fr)}
+html.fit .col-c{grid-template-rows:minmax(0,1fr)}
+html.fit .col-r{grid-template-rows:minmax(0,1fr)}
+html.fit .card{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+html.fit .tt-wrap{flex:1;max-height:none;min-height:0}
+html.fit .mapwrap{flex:1;min-height:0}
+html.fit #kmap{max-width:none;height:100%;width:100%}
+html.fit .side-body{flex:1;min-height:0;overflow-y:auto}
+html.fit .steplist{max-height:none}
+</style>
+
+<div class="app">
+  <header class="top">
+    <h1>K-Map <span>Lab</span></h1>
+    <p class="kicker">Digital logic design · Karnaugh-map simplification</p>
+  </header>
+
+  <main class="grid">
+    <div class="col col-l">
+      <section class="card o-fn" aria-labelledby="fnTitle">
+        <div class="card-h"><h2 id="fnTitle">Function</h2><span class="sub" id="modeSub">learn mode</span></div>
+        <div class="pad">
+          <div><span class="lbl">Mode</span>
+            <div class="seg" id="modeSeg" role="group" aria-label="Mode"><button type="button" data-v="learn">Learn</button><button type="button" data-v="practice">Practice</button></div></div>
+          <div><span class="lbl">Variables</span>
+            <div class="seg" id="nSeg" role="group" aria-label="Number of variables"><button type="button" data-v="2">2 · A B</button><button type="button" data-v="3">3 · A B C</button><button type="button" data-v="4">4 · A B C D</button></div></div>
+          <div><span class="lbl">Simplify to</span>
+            <div class="seg" id="formSeg" role="group" aria-label="Form"><button type="button" data-v="sop">SOP · group the 1s</button><button type="button" data-v="pos">POS · group the 0s</button></div></div>
+          <div id="learnIn">
+            <span class="lbl">Minterms and don't-cares</span>
+            <form id="fnForm" class="pad" style="padding:0;gap:6px" autocomplete="off">
+              <label class="fld" for="inM">Σm(<input id="inM" spellcheck="false">)</label>
+              <label class="fld" for="inD">&nbsp;+ d(<input id="inD" spellcheck="false" placeholder="optional">)</label>
+              <div class="row2"><button class="btn primary" type="submit">Load function</button><button class="btn" type="button" id="rndBtn">Random</button><button class="btn" type="button" id="clrBtn">Clear</button></div>
+              <div class="err" id="fnErr"></div>
+            </form>
+            <p class="hint">Or click a cell in the map (or an F value in the truth table) to cycle it 0 → 1 → X.</p>
+          </div>
+          <div id="pracIn" hidden>
+            <span class="lbl">Difficulty</span>
+            <div class="seg" id="diffSeg" role="group" aria-label="Difficulty"><button type="button" data-v="easy">Easy · 3 var</button><button type="button" data-v="med">Medium · 4 var</button><button type="button" data-v="hard">Hard · 4 var + X</button></div>
+            <div class="row2" style="margin-top:8px"><button class="btn primary" type="button" id="newBtn">New function</button><span class="score" id="score"></span></div>
+          </div>
+        </div>
+      </section>
+      <section class="card o-tt" aria-labelledby="ttTitle">
+        <div class="card-h"><h2 id="ttTitle">Truth table</h2><span class="sub">m = row number</span></div>
+        <div class="tt-wrap"><table class="tt" id="tt"></table></div>
+      </section>
+    </div>
+
+    <div class="col col-c">
+      <section class="card mapcard o-map" aria-labelledby="mapTitle">
+        <div class="card-h"><h2 id="mapTitle">Karnaugh map</h2><span class="canon" id="canon"></span></div>
+        <div class="mapwrap"><svg id="kmap" role="img" aria-label="Karnaugh map"></svg></div>
+        <div class="exprbar">
+          <div class="legend"><span class="v1">1 = minterm</span><span class="v0">0</span><span class="vx">X = don't care</span><span>bars show where a variable is 1 · edges wrap around</span></div>
+          <div class="expr" id="exprOut" aria-live="polite"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col col-r">
+      <section class="card o-side" aria-labelledby="sideTitle">
+        <div class="card-h"><h2 id="sideTitle">Step by step</h2>
+          <div class="row2" id="learnCtl"><button class="btn" id="prevBtn" type="button">‹ Back</button><button class="btn primary" id="nextBtn" type="button">Next ›</button><button class="btn" id="allBtn" type="button">Show all</button></div></div>
+        <div class="side-body">
+          <div class="pad" id="learnPane"><div class="steplist"><ol class="steps" id="steps"></ol></div></div>
+          <div class="pad" id="pracPane" hidden>
+            <ol class="rules">
+              <li>Click (or drag across) cells to select a group, then press <b>Add group</b> or Enter.</li>
+              <li>A group is a rectangle of 1, 2, 4, 8 or 16 cells that may wrap around the edges.</li>
+              <li id="ruleForm">Groups may hold 1s and X, never a 0. Make each group as large as possible.</li>
+            </ol>
+            <div class="row2"><button class="btn primary" id="addBtn" type="button" disabled>Add group</button><button class="btn" id="unselBtn" type="button">Clear selection</button></div>
+            <div class="fb" id="addFb" role="status"></div>
+            <div><span class="lbl">Your groups</span><ul class="groups" id="groups"></ul></div>
+            <div class="row2"><button class="btn primary" id="checkBtn" type="button">Check my answer</button><button class="btn" id="solBtn" type="button">Show solution</button><button class="btn" id="resetGBtn" type="button">Remove all</button></div>
+            <div class="fb" id="checkFb" role="status"></div>
+            <form id="typeForm" autocomplete="off" style="display:grid;gap:6px">
+              <label class="lbl" for="typeIn">Or type your simplified expression <span style="font-weight:400">(A' for NOT A, + for OR, AB or A·B for AND)</span></label>
+              <div class="fld">F =<input id="typeIn" spellcheck="false" placeholder="e.g. A'C + BD'"><button class="btn" type="submit">Check</button></div>
+            </form>
+            <div class="fb" id="typeFb" role="status"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const VARS=['A','B','C','D'];
+const GRAY=[0,1,3,2];
+const COLORS=['#e8590c','#1c7ed6','#2f9e44','#ae3ec9','#f08c00','#0ca678','#d6336c','#5c7cfa','#868e96','#fab005'];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- state ---------------- */
+const S={mode:'learn',n:4,form:'sop',diff:'med',f:[],step:0,sel:new Set(),groups:[],tally:{tries:0,best:0}};
+function blank(n){return new Array(1<<n).fill(0)}
+S.f=blank(4);[0,2,5,7,8,10,13,15].forEach(m=>S.f[m]=1);S.f[6]='x';  // example: F = B'D' + BD (+ X at m6)
+
+/* ---------------- map geometry ---------------- */
+function layout(n){
+  // rows use the first variables, columns the rest; both in Gray order
+  const rv=n===2?1:n===3?1:2, cv=n-rv;
+  const rows=rv===1?[0,1]:GRAY, cols=cv===1?[0,1]:GRAY;
+  return{rv,cv,rows,cols,R:rows.length,C:cols.length};
+}
+function mAt(L,r,c){return (L.rows[r]<<L.cv)|L.cols[c]}
+function rcOf(L,m){const rcode=m>>L.cv,ccode=m&((1<<L.cv)-1);return[L.rows.indexOf(rcode),L.cols.indexOf(ccode)]}
+const bitsStr=(v,k)=>v.toString(2).padStart(k,'0');
+
+/* ---------------- logic core ---------------- */
+function onSet(f,form){const o=[];f.forEach((v,m)=>{if(form==='sop'?v===1:v===0)o.push(m)});return o}
+function dcSet(f){const o=[];f.forEach((v,m)=>{if(v==='x')o.push(m)});return o}
+function cubeCells(n,c){const o=[];for(let m=0;m<(1<<n);m++)if((m&~c.mask)===c.val)o.push(m);return o}
+function contains(a,b){return (a.mask&b.mask)===b.mask&&(b.val&~a.mask)===a.val}
+function litCount(n,c){let k=0;for(let i=0;i<n;i++)if(!(c.mask>>i&1))k++;return k}
+function primes(n,on,dc){
+  const ok=new Set([...on,...dc]),onS=new Set(on),imps=[];
+  const N=1<<n;
+  for(let mask=0;mask<N;mask++)for(let val=0;val<N;val++){if(val&mask)continue;
+    const cells=cubeCells(n,{val,mask});if(cells.every(m=>ok.has(m))&&cells.some(m=>onS.has(m)))imps.push({val,mask,cells})}
+  const all=[];for(let mask=0;mask<N;mask++)for(let val=0;val<N;val++){if(val&mask)continue;const cells=cubeCells(n,{val,mask});if(cells.every(m=>ok.has(m)))all.push({val,mask})}
+  return imps.filter(c=>!all.some(d=>(d.mask!==c.mask||d.val!==c.val)&&contains(d,c)))
+    .sort((a,b)=>b.cells.length-a.cells.length||a.val-b.val||a.mask-b.mask);
+}
+function solve(n,f,form){
+  const on=onSet(f,form),dc=dcSet(f);
+  if(!on.length)return{on,dc,pis:[],ess:[],cover:[],trivial:form==='sop'?'0':'1'};
+  const pis=primes(n,on,dc);
+  if(pis.length===1&&pis[0].mask===(1<<n)-1)return{on,dc,pis,ess:[0],cover:[0],trivial:form==='sop'?'1':'0',dist:{}};
+  const by={};on.forEach(m=>by[m]=pis.map((p,i)=>i).filter(i=>pis[i].cells.includes(m)));
+  const ess=[],dist={};
+  on.forEach(m=>{if(by[m].length===1){const i=by[m][0];if(!ess.includes(i))ess.push(i);(dist[i]=dist[i]||[]).push(m)}});
+  const covered=new Set();ess.forEach(i=>pis[i].cells.forEach(m=>covered.add(m)));
+  const left=on.filter(m=>!covered.has(m));
+  const rest=pis.map((p,i)=>i).filter(i=>!ess.includes(i));
+  let best=null;
+  if(left.length){
+    for(let k=1;k<=rest.length&&!best;k++){
+      const comb=(start,pick)=>{if(pick.length===k){const cov=new Set();pick.forEach(i=>pis[i].cells.forEach(m=>cov.add(m)));
+          if(left.every(m=>cov.has(m))){const lits=pick.reduce((s,i)=>s+litCount(n,pis[i]),0);if(!best||lits<best.lits)best={pick:[...pick],lits}}return}
+        for(let j=start;j<rest.length;j++){pick.push(rest[j]);comb(j+1,pick);pick.pop()}};
+      comb(0,[]);
+    }
+  }
+  const cover=[...ess,...(best?best.pick:[])];
+  return{on,dc,pis,ess,dist,left,extra:best?best.pick:[],cover};
+}
+function termHTML(n,c,form){
+  const parts=[];
+  for(let i=0;i<n;i++){const bit=n-1-i;if(c.mask>>bit&1)continue;const one=(c.val>>bit&1)===1;
+    const neg=form==='sop'?!one:one;parts.push(neg?`<span class="ol">${VARS[i]}</span>`:VARS[i])}
+  if(!parts.length)return form==='sop'?'1':'0';
+  return form==='sop'?`<span class="t">${parts.join('')}</span>`:`<span class="t">(${parts.join(' + ')})</span>`;
+}
+function termText(n,c,form){
+  const parts=[];for(let i=0;i<n;i++){const bit=n-1-i;if(c.mask>>bit&1)continue;const one=(c.val>>bit&1)===1;const neg=form==='sop'?!one:one;parts.push(VARS[i]+(neg?"'":''))}
+  if(!parts.length)return form==='sop'?'1':'0';return form==='sop'?parts.join(''):'('+parts.join(' + ')+')';
+}
+function exprHTML(n,cubes,form){
+  if(!cubes.length)return form==='sop'?'0':'1';
+  return cubes.map(c=>termHTML(n,c,form)).join(form==='sop'?' + ':' ');
+}
+/* expression parser for typed answers */
+function parseExpr(src,n){
+  const s=src.replace(/\s+/g,'').replace(/[·*.]/g,'&').replace(/[’`′]/g,"'");let i=0;
+  const vars=VARS.slice(0,n);let lits=0;
+  function peek(){return s[i]}
+  function expr(){let a=term();while(peek()==='+'||peek()==='|'){i++;const b=term();const x=a;a=v=>x(v)|b(v)}return a}
+  function term(){let a=factor();while(i<s.length&&(peek()==='&'||/[A-Da-d(~!01]/.test(peek()))){if(peek()==='&')i++;const b=factor();const x=a;a=v=>x(v)&b(v)}return a}
+  function factor(){
+    let f;const ch=peek();
+    if(ch==='~'||ch==='!'){i++;const g=factor();f=v=>1-g(v)}
+    else if(ch==='('){i++;const g=expr();if(peek()!==')')throw new Error('Missing )');i++;f=g}
+    else if(ch==='0'||ch==='1'){i++;const k=+ch;f=()=>k}
+    else if(ch&&/[A-Da-d]/.test(ch)){const u=ch.toUpperCase();const k=vars.indexOf(u);if(k<0)throw new Error(`${u} is not a variable of this ${n}-variable function`);i++;lits++;f=v=>(v>>(n-1-k))&1}
+    else throw new Error(ch?`Unexpected "${ch}"`:'The expression ended too early');
+    while(peek()==="'"){i++;const g=f;f=v=>1-g(v)}
+    return f;
+  }
+  const fn=expr();if(i<s.length)throw new Error(`Unexpected "${s[i]}"`);
+  return{fn,lits};
+}
+/* validate a selected group */
+function analyseGroup(n,cells,f,form){
+  const set=[...new Set(cells)].sort((a,b)=>a-b);
+  const k=set.length;if(!k)return{ok:false,msg:'Select some cells first.'};
+  if(k&(k-1))return{ok:false,msg:`${k} cells is not a power of two. Groups have 1, 2, 4, 8 or 16 cells.`};
+  let and=(1<<n)-1,or=0;set.forEach(m=>{and&=m;or|=m});
+  const mask=(and^or)&((1<<n)-1),val=and;
+  const cube={val,mask};const cc=cubeCells(n,cube);
+  if(cc.length!==k||!cc.every(m=>set.includes(m)))return{ok:false,msg:'These cells do not form a rectangle on the map (remember the edges wrap around). A group must be a block like 1×2, 2×2, 1×4 or 2×4.'};
+  const bad=set.filter(m=>form==='sop'?f[m]===0:f[m]===1);
+  if(bad.length)return{ok:false,msg:`The group includes ${form==='sop'?'a 0':'a 1'} at m${bad.join(', m')}. ${form==='sop'?'SOP groups':'POS groups'} may only contain ${form==='sop'?'1s':'0s'} and don't-cares.`};
+  const on=onSet(f,form);if(!set.some(m=>on.includes(m)))return{ok:false,msg:"A group made only of don't-cares adds nothing. Include at least one "+(form==='sop'?'1':'0')+'.'};
+  const pis=primes(n,on,dcSet(f));const prime=pis.some(p=>p.val===val&&p.mask===mask);
+  let bigger=null;if(!prime)bigger=pis.filter(p=>contains(p,cube)).sort((a,b)=>b.cells.length-a.cells.length)[0];
+  return{ok:true,cube:{val,mask,cells:cc},prime,bigger};
+}
+
+/* ---------------- rendering: map ---------------- */
+const NS='http://www.w3.org/2000/svg';
+const CELL=100,ML=110,MT=110;
+let curLoops=[],curStars=[],hlCells=new Set();
+function renderMap(){
+  const n=S.n,L=layout(n);
+  const W=ML+L.C*CELL+70,H=MT+L.R*CELL+70;
+  const svg=$('#kmap');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const rvNames=VARS.slice(0,L.rv).join(''),cvNames=VARS.slice(L.rv,n).join('');
+  let s=`<defs><clipPath id="clipG"><rect x="${ML}" y="${MT}" width="${L.C*CELL}" height="${L.R*CELL}"/></clipPath></defs>`;
+  // corner label
+  s+=`<path d="M${ML-70} ${MT-70} L${ML} ${MT}" stroke="var(--muted)" stroke-width="1.5"/>`;
+  s+=`<text x="${ML-62}" y="${MT-8}" class="vname">${rvNames}</text><text x="${ML-30}" y="${MT-60}" class="vname">${cvNames}</text>`;
+  // headers
+  for(let c=0;c<L.C;c++)s+=`<text x="${ML+c*CELL+CELL/2}" y="${MT-14}" class="hdr" text-anchor="middle">${bitsStr(L.cols[c],L.cv)}</text>`;
+  for(let r=0;r<L.R;r++)s+=`<text x="${ML-14}" y="${MT+r*CELL+CELL/2+7}" class="hdr" text-anchor="end">${bitsStr(L.rows[r],L.rv)}</text>`;
+  // variable bars (where each variable is 1)
+  const bars=[];
+  for(let j=0;j<L.cv;j++){const bit=L.cv-1-j,name=VARS[L.rv+j];const idx=[];for(let c=0;c<L.C;c++)if(L.cols[c]>>bit&1)idx.push(c);
+    const y=j===0?MT+L.R*CELL+22:MT+L.R*CELL+48;bars.push(`<line class="bar" x1="${ML+idx[0]*CELL+8}" x2="${ML+(idx[idx.length-1]+1)*CELL-8}" y1="${y}" y2="${y}"/><text class="barl" x="${ML+(idx[0]+idx[idx.length-1]+1)*CELL/2}" y="${y+6}" text-anchor="middle" dy="${j===0?14:14}">${name}</text>`)}
+  for(let j=0;j<L.rv;j++){const bit=L.rv-1-j,name=VARS[j];const idx=[];for(let r=0;r<L.R;r++)if(L.rows[r]>>bit&1)idx.push(r);
+    const x=ML+L.C*CELL+(j===0?22:46);bars.push(`<line class="bar" y1="${MT+idx[0]*CELL+8}" y2="${MT+(idx[idx.length-1]+1)*CELL-8}" x1="${x}" x2="${x}"/><text class="barl" y="${MT+(idx[0]+idx[idx.length-1]+1)*CELL/2+6}" x="${x+10}">${name}</text>`)}
+  s+=bars.join('');
+  // cells
+  for(let r=0;r<L.R;r++)for(let c=0;c<L.C;c++){const m=mAt(L,r,c),v=S.f[m];
+    const cls='cell'+(S.sel.has(m)?' sel':'')+(hlCells.has(m)?' hl':'');
+    s+=`<rect class="${cls}" data-m="${m}" x="${ML+c*CELL}" y="${MT+r*CELL}" width="${CELL}" height="${CELL}"/>`;
+    s+=`<text class="mi" x="${ML+c*CELL+8}" y="${MT+r*CELL+18}" pointer-events="none">m${m}</text>`;
+    s+=`<text class="val ${v===1?'v1':v==='x'?'vx':'v0'}" x="${ML+c*CELL+CELL/2}" y="${MT+r*CELL+CELL/2+4}" pointer-events="none" style="fill:var(${v===1?'--one':v==='x'?'--dc':'--zero'})">${v==='x'?'X':v}</text>`;
+  }
+  s+=`<rect x="${ML}" y="${MT}" width="${L.C*CELL}" height="${L.R*CELL}" fill="none" stroke="var(--ink)" stroke-width="2"/>`;
+  // loops
+  s+=`<g clip-path="url(#clipG)" pointer-events="none">`;
+  curLoops.forEach((lp,k)=>{s+=loopSVG(L,lp,k)});
+  s+=`</g>`;
+  curStars.forEach(m=>{const[r,c]=rcOf(L,m);s+=`<text class="star" x="${ML+c*CELL+CELL-22}" y="${MT+r*CELL+26}" pointer-events="none">★</text>`});
+  svg.innerHTML=s;
+}
+function segs(set,N){
+  const a=[...set].sort((x,y)=>x-y);
+  if(a.length===N)return[[0,N-1,false,false]];
+  const runs=[];let st=a[0],pr=a[0];
+  for(let i=1;i<a.length;i++){if(a[i]===pr+1){pr=a[i]}else{runs.push([st,pr]);st=pr=a[i]}}runs.push([st,pr]);
+  if(runs.length===2&&runs[0][0]===0&&runs[1][1]===N-1)return[[runs[0][0],runs[0][1],true,false],[runs[1][0],runs[1][1],false,true]];
+  return runs.map(r=>[r[0],r[1],false,false]);
+}
+function loopSVG(L,lp,k){
+  const cells=lp.cells;const rs=new Set(),cs=new Set();cells.forEach(m=>{const[r,c]=rcOf(L,m);rs.add(r);cs.add(c)});
+  const inset=7+(lp.slot!==undefined?lp.slot:k)%5*5;const col=lp.color;
+  let out=`<g class="loopg${lp.enter?' enter':''}">`;
+  for(const[r0,r1,ro0,ro1]of segs(rs,L.R))for(const[c0,c1,co0,co1]of segs(cs,L.C)){
+    let x=ML+c0*CELL+inset,y=MT+r0*CELL+inset,w=(c1-c0+1)*CELL-2*inset,h=(r1-r0+1)*CELL-2*inset;
+    if(co0){x-=40;w+=40}if(co1){w+=40}if(ro0){y-=40;h+=40}if(ro1){h+=40}
+    out+=`<rect class="loop${lp.faint?' faint':''}${lp.bad?' bad':''}${lp.enter?' enter':''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="26" fill="${col}" stroke="${col}"/>`;
+  }
+  return out+'</g>';
+}
+
+/* ---------------- rendering: truth table + canon ---------------- */
+function renderTT(){
+  const n=S.n;let h='<thead><tr><th>m</th>'+VARS.slice(0,n).map(v=>`<th>${v}</th>`).join('')+'<th>F</th></tr></thead><tbody>';
+  for(let m=0;m<(1<<n);m++){const v=S.f[m];h+=`<tr data-m="${m}" class="${hlCells.has(m)||S.sel.has(m)?'hl':''}"><td class="m">${m}</td>`+bitsStr(m,n).split('').map(b=>`<td>${b}</td>`).join('')+
+    `<td class="f ${v===1?'v1':v==='x'?'vx':'v0'}" data-m="${m}" ${S.mode==='learn'?'title="Click to change"':''}>${v==='x'?'X':v}</td></tr>`}
+  $('#tt').innerHTML=h+'</tbody>';
+}
+function canonText(){
+  const ones=[],zs=[],ds=[];S.f.forEach((v,m)=>{if(v===1)ones.push(m);else if(v==='x')ds.push(m);else zs.push(m)});
+  if(S.form==='sop')return `F = Σm(${ones.join(', ')||' '})${ds.length?` + d(${ds.join(', ')})`:''}`;
+  return `F = ΠM(${zs.join(', ')||' '})${ds.length?` · d(${ds.join(', ')})`:''}`;
+}
+function syncInputs(){
+  const ones=[],ds=[];S.f.forEach((v,m)=>{if(v===1)ones.push(m);else if(v==='x')ds.push(m)});
+  $('#inM').value=ones.join(', ');$('#inD').value=ds.join(', ');
+}
+
+/* ---------------- learn mode ---------------- */
+let steps=[];
+function buildSteps(){
+  const n=S.n,form=S.form,sol=solve(n,S.f,form);const word=form==='sop'?'1':'0',words=form==='sop'?'1s':'0s';
+  steps=[];
+  const L=layout(n);
+  steps.push({t:`<b>Read the map.</b> Each cell is one truth-table row; the small number is its minterm m. Rows and columns run in Gray code (${n>=3?'00, 01, 11, 10':'0, 1'}), so side-by-side cells differ in exactly one variable. That is also true across the edges: the ${n===4?'left and right columns, and the top and bottom rows,':'left and right columns'} are neighbours.`,loops:[],stars:[],expr:null});
+  if(sol.trivial!==undefined&&!sol.pis.length){steps.push({t:`There are no ${words} to group, so F = <b>${sol.trivial}</b>.`,loops:[],stars:[],expr:sol.trivial});return}
+  if(sol.trivial!==undefined){steps.push({t:`Every cell is a ${word} or X, so one group covers the whole map and F = <b>${sol.trivial}</b>.`,loops:[{cells:sol.pis[0].cells,color:COLORS[0]}],stars:[],expr:sol.trivial});return}
+  steps.push({t:`<b>Mark the ${words}.</b> ${form==='sop'?`F is 1 in ${sol.on.length} cell${sol.on.length>1?'s':''}`:`F is 0 in ${sol.on.length} cell${sol.on.length>1?'s':''}`}${sol.dc.length?`, and ${sol.dc.length} cell${sol.dc.length>1?'s are':' is'} don't-care (X). An X may join a group when it makes the group bigger, and can be ignored otherwise`:''}.`,loops:[],stars:[],hl:sol.on,expr:null});
+  const pisL=sol.pis.map((p,i)=>({cells:p.cells,color:COLORS[i%COLORS.length],slot:i}));
+  sol.pis.forEach((p,i)=>{
+    const sz=p.cells.length,elim=Math.log2(sz);
+    steps.push({t:`<b>Prime implicant ${i+1}:</b> the ${sz}-cell group m${p.cells.join(', m')} cannot grow any larger. ${elim?`Inside it ${elim} variable${elim>1?'s change':' changes'} value and drop${elim>1?'':'s'} out; `:'It stands alone; '}the variables that stay constant give <span class="expr">${termHTML(n,p,form)}</span>.`,
+      loops:pisL.slice(0,i+1).map((l,j)=>({...l,enter:j===i})),stars:[],expr:null});
+  });
+  const essL=sol.ess.map(i=>pisL[i]);
+  const stars=[].concat(...sol.ess.map(i=>sol.dist[i]||[]));
+  steps.push({t:sol.ess.length?`<b>Essential prime implicants.</b> A ${word} covered by only one prime implicant (★) forces that group into the answer: ${sol.ess.map(i=>`<span class="expr">${termHTML(n,sol.pis[i],form)}</span>`).join(', ')}.`:`<b>Essential prime implicants.</b> Every ${word} is covered by at least two prime implicants, so none is essential. We choose a cover in the next step.`,
+    loops:pisL.map((l,i)=>({...l,faint:!sol.ess.includes(i)})),stars,expr:null});
+  if(sol.left&&sol.left.length){
+    steps.push({t:`<b>Cover what is left.</b> m${sol.left.join(', m')} ${sol.left.length>1?'are':'is'} not yet covered. The fewest extra groups (and literals) that do it: ${sol.extra.map(i=>`<span class="expr">${termHTML(n,sol.pis[i],form)}</span>`).join(', ')}. Other prime implicants are redundant.`,
+      loops:pisL.map((l,i)=>({...l,faint:!sol.cover.includes(i)})),stars,expr:null});
+  }else if(sol.pis.length>sol.ess.length){
+    steps.push({t:`<b>Drop the rest.</b> The essential groups already cover every ${word}; the other prime implicants are redundant.`,loops:essL,stars,expr:null});
+  }
+  const cubes=sol.cover.map(i=>sol.pis[i]);const lits=cubes.reduce((s,c)=>s+litCount(n,c),0);
+  const canonLits=sol.on.length*n;
+  steps.push({t:`<b>Result.</b> ${cubes.length} term${cubes.length>1?'s':''}, ${lits} literal${lits!==1?'s':''}, compared with ${sol.on.length} terms and ${canonLits} literals in the canonical ${form==='sop'?'sum of minterms':'product of maxterms'}.`,
+    loops:sol.cover.map(i=>pisL[i]),stars:[],expr:exprHTML(n,cubes,form),final:true});
+}
+function renderSteps(){
+  $('#steps').innerHTML=steps.map((s,k)=>`<li data-k="${k}" class="${k<S.step?'done':k===S.step?'cur':''}"><span class="n">${k+1}</span><span>${s.t}${s.expr&&s.final?`<div class="expr" style="margin-top:4px">F = ${s.expr}</div>`:''}</span></li>`).join('');
+  const cur=$('#steps li.cur');if(cur)cur.scrollIntoView({block:'nearest'});
+  const st=steps[S.step];curLoops=st.loops||[];curStars=st.stars||[];hlCells=new Set(st.hl||[]);
+  $('#prevBtn').disabled=S.step===0;$('#nextBtn').disabled=S.step>=steps.length-1;
+  const last=steps[steps.length-1];
+  $('#exprOut').className='expr'+(S.step>=steps.length-1?'':' muted');
+  $('#exprOut').innerHTML=S.step>=steps.length-1?`F = ${last.expr}`:`Minimal ${S.form.toUpperCase()}: step through, or press <b>Show all</b>.`;
+}
+
+/* ---------------- practice mode ---------------- */
+function randomFn(){
+  const d=S.diff;const n=d==='easy'?3:4;S.n=n;const N=1<<n;
+  let f,tries=0;
+  do{f=blank(n);const k=d==='easy'?2+Math.floor(Math.random()*4):4+Math.floor(Math.random()*6);
+    const idx=[...Array(N).keys()].sort(()=>Math.random()-.5);idx.slice(0,k).forEach(m=>f[m]=1);
+    if(d==='hard'){idx.slice(k,k+2+Math.floor(Math.random()*2)).forEach(m=>f[m]='x')}
+    tries++;
+    var sol=solve(n,f,S.form);
+  }while((sol.trivial!==undefined||sol.cover.length<2||(d!=='easy'&&sol.cover.length<3))&&tries<200);
+  S.f=f;
+}
+function groupLoops(){return S.groups.map((g,i)=>({cells:g.cells,color:COLORS[i%COLORS.length],bad:!g.prime,slot:i}))}
+function renderGroups(){
+  $('#groups').innerHTML=S.groups.length?S.groups.map((g,i)=>`<li class="${g.prime?'':'np'}"><span class="sw" style="background:${COLORS[i%COLORS.length]}"></span><span class="expr">${termHTML(S.n,g,S.form)}</span><span class="score">${g.cells.length} cell${g.cells.length>1?'s':''}${g.prime?'':' · not prime'}</span><button class="x" type="button" data-i="${i}" aria-label="Remove group">✕</button></li>`).join(''):'<li style="color:var(--muted);border-style:dashed">No groups yet.</li>';
+  curLoops=groupLoops();curStars=[];
+  $('#exprOut').className='expr'+(S.groups.length?'':' muted');
+  $('#exprOut').innerHTML=S.groups.length?`Your answer: F = ${exprHTML(S.n,S.groups,S.form)}`:'Your answer will build up here as you add groups.';
+  $('#addBtn').disabled=!S.sel.size;
+}
+function fb(id,cls,html){const e=$(id);e.className='fb show '+cls;e.innerHTML=html}
+function fbClear(id){$(id).className='fb';$(id).innerHTML=''}
+function addGroup(){
+  const a=analyseGroup(S.n,[...S.sel],S.f,S.form);
+  if(!a.ok){fb('#addFb','bad',a.msg);return}
+  if(S.groups.some(g=>g.val===a.cube.val&&g.mask===a.cube.mask)){fb('#addFb','warn','You already have that group.');return}
+  S.groups.push({...a.cube,prime:a.prime});S.sel.clear();
+  if(a.prime)fb('#addFb','ok',`Added <span class="expr">${termHTML(S.n,a.cube,S.form)}</span>. It is a prime implicant.`);
+  else fb('#addFb','warn',`Added <span class="expr">${termHTML(S.n,a.cube,S.form)}</span>, but it is not as large as it could be: it fits inside the ${a.bigger.cells.length}-cell group m${a.bigger.cells.join(', m')} (<span class="expr">${termHTML(S.n,a.bigger,S.form)}</span>). Bigger groups mean fewer literals.`);
+  fbClear('#checkFb');renderAll();
+}
+function checkAnswer(){
+  const n=S.n,sol=solve(n,S.f,S.form),on=sol.on;
+  const cov=new Set();S.groups.forEach(g=>g.cells.forEach(m=>cov.add(m)));
+  const miss=on.filter(m=>!cov.has(m));
+  S.tally.tries++;
+  if(!S.groups.length){fb('#checkFb','bad','Add some groups first.');return}
+  if(miss.length){fb('#checkFb','bad',`Not yet: m${miss.join(', m')} ${miss.length>1?'are':'is'} not covered by any group.`);renderScore();return}
+  const red=S.groups.map((g,i)=>i).filter(i=>{const others=new Set();S.groups.forEach((g,j)=>{if(j!==i)g.cells.forEach(m=>others.add(m))});return S.groups[i].cells.filter(m=>on.includes(m)).every(m=>others.has(m))});
+  const lits=S.groups.reduce((s,g)=>s+litCount(n,g),0);
+  const best=sol.cover.map(i=>sol.pis[i]);const bl=best.reduce((s,c)=>s+litCount(n,c),0);
+  const np=S.groups.filter(g=>!g.prime).length;
+  if(S.groups.length===best.length&&lits===bl&&!np){S.tally.best++;fb('#checkFb','ok',`<b>Optimal.</b> Every ${S.form==='sop'?'1':'0'} is covered with ${best.length} term${best.length>1?'s':''} and ${lits} literals, the minimum possible. Press <b>New function</b> for another.`)}
+  else{
+    const why=[];if(np)why.push(`${np} group${np>1?'s are':' is'} not prime (could be bigger)`);if(red.length)why.push(`${red.length>1?'groups':'group'} ${red.map(i=>i+1).join(', ')} ${red.length>1?'are':'is'} redundant: every ${S.form==='sop'?'1':'0'} in ${red.length>1?'them':'it'} is already covered`);
+    fb('#checkFb','warn',`<b>Correct, but not minimal.</b> Your cover uses ${S.groups.length} terms and ${lits} literals; the minimum is ${best.length} terms and ${bl} literals.${why.length?' '+why.join('; ')+'.':''} Hint: start with the ${S.form==='sop'?'1s':'0s'} that only one group can cover.`);
+  }
+  renderScore();
+}
+function showSolution(){
+  const sol=solve(S.n,S.f,S.form);
+  S.groups=sol.cover.map(i=>({...sol.pis[i],prime:true}));S.sel.clear();fbClear('#addFb');
+  fb('#checkFb','warn',`Solution shown: F = <span class="expr">${exprHTML(S.n,S.groups,S.form)}</span>. ${sol.ess.length?`Essential groups: ${sol.ess.map(i=>`<span class="expr">${termHTML(S.n,sol.pis[i],S.form)}</span>`).join(', ')}.`:''}`);
+  renderAll();
+}
+function checkTyped(src){
+  const n=S.n;let p;
+  try{p=parseExpr(src,n)}catch(e){fb('#typeFb','bad',esc(e.message));return}
+  const wrong=[];for(let m=0;m<(1<<n);m++){if(S.f[m]==='x')continue;if(p.fn(m)!==S.f[m])wrong.push(m)}
+  if(wrong.length){fb('#typeFb','bad',`Not equivalent: your expression gives the wrong value at m${wrong.slice(0,8).join(', m')}${wrong.length>8?'…':''}.`);return}
+  const sol=solve(n,S.f,S.form);const bl=sol.cover.reduce((s,i)=>s+litCount(n,sol.pis[i]),0);
+  if(p.lits<=bl)fb('#typeFb','ok',`<b>Correct and minimal</b> (${p.lits} literals).`);
+  else fb('#typeFb','warn',`<b>Equivalent</b>, but it uses ${p.lits} literals; the minimal ${S.form.toUpperCase()} uses ${bl}.`);
+}
+function renderScore(){$('#score').innerHTML=S.tally.tries?`optimal <b>${S.tally.best}</b> / checks <b>${S.tally.tries}</b>`:''}
+
+/* ---------------- controls ---------------- */
+function pressed(){
+  [['#modeSeg','mode'],['#nSeg','n'],['#formSeg','form'],['#diffSeg','diff']].forEach(([id,k])=>$(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v==String(S[k])))));
+  const learn=S.mode==='learn';
+  $('#learnIn').hidden=!learn;$('#pracIn').hidden=learn;$('#learnPane').hidden=!learn;$('#pracPane').hidden=learn;$('#learnCtl').hidden=!learn;
+  $('#nSeg').parentElement.hidden=!learn;
+  $('#sideTitle').textContent=learn?'Step by step':'Practice';$('#modeSub').textContent=learn?'learn mode':'practice mode';
+  $('#ruleForm').innerHTML=S.form==='sop'?'Groups may hold 1s and X, never a 0. Make each group as large as possible.':'POS: group the 0s (and X), never a 1. Each group gives one sum term.';
+}
+function renderAll(){
+  $('#canon').textContent=canonText();
+  if(S.mode==='learn'){renderSteps()}else{renderGroups()}
+  renderMap();renderTT();pressed();
+}
+function relearn(){S.step=0;buildSteps();renderAll()}
+function setMode(m){
+  S.mode=m;S.sel.clear();S.groups=[];fbClear('#addFb');fbClear('#checkFb');fbClear('#typeFb');
+  if(m==='practice'){randomFn()}
+  else{syncInputs();buildSteps();S.step=0}
+  renderAll();
+}
+function seg(id,key,conv,after){$(id).querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S[key]=conv?conv(b.dataset.v):b.dataset.v;after()}))}
+seg('#modeSeg','mode',null,()=>setMode(S.mode));
+seg('#nSeg','n',v=>+v,()=>{const old=S.f,on=S.n;S.f=blank(S.n);for(let m=0;m<Math.min(old.length,S.f.length);m++)S.f[m]=old[m];syncInputs();relearn()});
+seg('#formSeg','form',null,()=>{if(S.mode==='learn')relearn();else{S.groups=[];S.sel.clear();fbClear('#addFb');fbClear('#checkFb');fbClear('#typeFb');renderAll()}});
+seg('#diffSeg','diff',null,()=>setMode('practice'));
+function parseList(t,N,name){
+  const out=[];if(!t.trim())return out;
+  for(const tok of t.split(/[\s,;]+/).filter(Boolean)){const v=Number(tok.replace(/^m/i,''));if(!Number.isInteger(v)||v<0||v>=N)throw new Error(`"${tok}" is not a valid ${name} for ${S.n} variables (0–${N-1}).`);out.push(v)}
+  return out;
+}
+$('#fnForm').addEventListener('submit',e=>{e.preventDefault();
+  try{const N=1<<S.n;const ms=parseList($('#inM').value,N,'minterm'),ds=parseList($('#inD').value,N,"don't-care");
+    const both=ms.filter(m=>ds.includes(m));if(both.length)throw new Error(`m${both.join(', m')} cannot be both a minterm and a don't-care.`);
+    S.f=blank(S.n);ms.forEach(m=>S.f[m]=1);ds.forEach(m=>S.f[m]='x');$('#fnErr').textContent='';relearn();
+  }catch(err){$('#fnErr').textContent=err.message}});
+$('#rndBtn').addEventListener('click',()=>{const save=S.diff;S.diff=S.n===3?'easy':Math.random()<.5?'hard':'med';const n=S.n;randomFn();
+  if(n!==S.n){S.n=n;S.f=blank(n);const N=1<<n;[...Array(N).keys()].sort(()=>Math.random()-.5).slice(0,Math.max(1,N/2-1)).forEach(m=>S.f[m]=1)}
+  S.diff=save;syncInputs();relearn()});
+$('#clrBtn').addEventListener('click',()=>{S.f=blank(S.n);syncInputs();relearn()});
+$('#prevBtn').addEventListener('click',()=>{if(S.step>0){S.step--;renderAll()}});
+$('#nextBtn').addEventListener('click',()=>{if(S.step<steps.length-1){S.step++;renderAll()}});
+$('#allBtn').addEventListener('click',()=>{S.step=steps.length-1;renderAll()});
+$('#steps').addEventListener('click',e=>{const li=e.target.closest('li');if(li){S.step=+li.dataset.k;renderAll()}});
+$('#newBtn').addEventListener('click',()=>setMode('practice'));
+$('#addBtn').addEventListener('click',addGroup);
+$('#unselBtn').addEventListener('click',()=>{S.sel.clear();fbClear('#addFb');renderAll()});
+$('#checkBtn').addEventListener('click',checkAnswer);
+$('#solBtn').addEventListener('click',showSolution);
+$('#resetGBtn').addEventListener('click',()=>{S.groups=[];S.sel.clear();fbClear('#addFb');fbClear('#checkFb');renderAll()});
+$('#groups').addEventListener('click',e=>{const x=e.target.closest('.x');if(x){S.groups.splice(+x.dataset.i,1);fbClear('#checkFb');renderAll()}});
+$('#typeForm').addEventListener('submit',e=>{e.preventDefault();checkTyped($('#typeIn').value)});
+
+/* map + truth-table interaction */
+function cycle(m){const v=S.f[m];S.f[m]=v===0?1:v===1?'x':0;syncInputs();relearn()}
+let drag=null;
+$('#kmap').addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c)return;const m=+c.dataset.m;
+  if(S.mode==='learn'){cycle(m);return}
+  e.preventDefault();drag={add:!S.sel.has(m)};if(drag.add)S.sel.add(m);else S.sel.delete(m);fbClear('#addFb');renderMap();$('#addBtn').disabled=!S.sel.size;renderTT()});
+$('#kmap').addEventListener('pointermove',e=>{if(!drag)return;const el=document.elementFromPoint(e.clientX,e.clientY);const c=el&&el.closest&&el.closest('.cell');if(!c)return;const m=+c.dataset.m;
+  const has=S.sel.has(m);if(drag.add&&!has){S.sel.add(m);renderMap();renderTT()}else if(!drag.add&&has){S.sel.delete(m);renderMap();renderTT()}$('#addBtn').disabled=!S.sel.size});
+window.addEventListener('pointerup',()=>{drag=null});
+document.addEventListener('keydown',e=>{if(S.mode==='practice'&&e.key==='Enter'&&S.sel.size&&document.activeElement.tagName!=='INPUT'){e.preventDefault();addGroup()}});
+$('#tt').addEventListener('click',e=>{const td=e.target.closest('td.f');if(td&&S.mode==='learn')cycle(+td.dataset.m)});
+$('#tt').addEventListener('mouseover',e=>{const tr=e.target.closest('tr[data-m]');const m=tr?+tr.dataset.m:null;const cells=document.querySelectorAll('#kmap .cell');cells.forEach(c=>c.classList.toggle('hl',+c.dataset.m===m))});
+$('#tt').addEventListener('mouseleave',()=>{document.querySelectorAll('#kmap .cell').forEach(c=>c.classList.remove('hl'))});
+
+/* ---------------- fit to screen ---------------- */
+const DW=1600,DH=900;
+function fit(){const app=$('.app'),vw=window.innerWidth,vh=window.innerHeight,on=vw>=760&&vw/vh>=1.1;
+  document.documentElement.classList.toggle('fit',on);
+  if(on){const k=Math.min(vw/DW,vh/DH);app.style.transform=`scale(${k})`;app.style.left=Math.max(0,(vw-DW*k)/2)+'px';app.style.top=Math.max(0,(vh-DH*k)/2)+'px'}
+  else{app.style.transform='';app.style.left='';app.style.top=''}}
+window.addEventListener('resize',fit);
+
+syncInputs();buildSteps();S.step=0;renderAll();fit();
+})();
+</script>
+
+</html>

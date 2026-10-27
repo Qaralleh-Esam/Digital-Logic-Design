@@ -6,6 +6,7 @@ Interactive learning materials for Digital Logic Design.
 
 - [Radix Lab](https://qaralleh-esam.github.io/Digital-Logic-Design/radix-lab.html) — conversions, binary codes, signed representations, and arithmetic visualizations.
 - [Radix Flashcards](https://qaralleh-esam.github.io/Digital-Logic-Design/radix-flashcards.html) — review decks and practice drills.
+- [K-Map Lab](https://qaralleh-esam.github.io/Digital-Logic-Design/kmap-lab.html) — Karnaugh-map simplification for 2–4 variables: step-by-step solutions (SOP/POS) and graded practice.
 - [Course homepage](https://qaralleh-esam.github.io/Digital-Logic-Design/)
 
 ## Publishing
